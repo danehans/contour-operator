@@ -1,19 +1,3 @@
-/*
-
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package main
 
 import (
@@ -27,7 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
-	"github.com/projectcontour/contour-operator/controllers"
+	contourcontroller "github.com/projectcontour/contour-operator/internal/controller/contour"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -43,9 +27,14 @@ func init() {
 	// +kubebuilder:scaffold:scheme
 }
 
+var (
+	image                string
+	metricsAddr          string
+	enableLeaderElection bool
+)
+
 func main() {
-	var metricsAddr string
-	var enableLeaderElection bool
+	flag.StringVar(&image, "image", "docker.io/projectcontour/contour:latest", "The image used for the managed Contour.")
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. "+
@@ -57,7 +46,6 @@ func main() {
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
 		MetricsBindAddress: metricsAddr,
-		Port:               9443,
 		LeaderElection:     enableLeaderElection,
 		LeaderElectionID:   "0d879e31.projectcontour.io",
 	})
@@ -66,7 +54,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controllers.ContourReconciler{
+	if err = (&contourcontroller.Reconciler{
+		Config: contourcontroller.Config{
+			Image: image,
+		},
 		Client: mgr.GetClient(),
 		Log:    ctrl.Log.WithName("controllers").WithName("Contour"),
 		Scheme: mgr.GetScheme(),
