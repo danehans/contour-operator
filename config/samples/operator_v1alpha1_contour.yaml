@@ -3,5 +3,6 @@ kind: Contour
 metadata:
   name: contour-sample
 spec:
-  # Add fields here
-  foo: bar
+  # Add required fields here
+  # TODO: Remove replicas since kubebuilder is defaulting to 2.
+  replicas: 2

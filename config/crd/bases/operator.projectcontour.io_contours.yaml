@@ -13,6 +13,8 @@ spec:
     plural: contours
     singular: contour
   scope: ""
+  subresources:
+    status: {}
   validation:
     openAPIV3Schema:
       description: Contour is the Schema for the contours API
@@ -32,13 +34,22 @@ spec:
         spec:
           description: ContourSpec defines the desired state of Contour
           properties:
-            foo:
-              description: Foo is an example field of Contour. Edit Contour_types.go
-                to remove/update
-              type: string
+            replicas:
+              description: replicas is the desired number of Contour replicas. If
+                unset, defaults to 2.
+              format: int32
+              type: integer
           type: object
         status:
           description: ContourStatus defines the observed state of Contour
+          properties:
+            availableReplicas:
+              description: availableReplicas is number of observed available Contour
+                replicas according to the deployment.
+              format: int32
+              type: integer
+          required:
+          - availableReplicas
           type: object
       type: object
   version: v1alpha1

@@ -25,20 +25,23 @@ import (
 
 // ContourSpec defines the desired state of Contour
 type ContourSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	// Foo is an example field of Contour. Edit Contour_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// replicas is the desired number of Contour replicas. If unset,
+	// defaults to 2.
+	//
+	// +optional
+	// +kubebuilder:default=2
+	Replicas int32 `json:"replicas,omitempty"`
 }
 
 // ContourStatus defines the observed state of Contour
 type ContourStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// availableReplicas is number of observed available Contour replicas according
+	// to the deployment.
+	AvailableReplicas int32 `json:"availableReplicas"`
 }
 
 // +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
 
 // Contour is the Schema for the contours API
 type Contour struct {
