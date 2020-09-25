@@ -17,8 +17,13 @@ limitations under the License.
 package contour
 
 import (
+	"context"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"path/filepath"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"testing"
+	"time"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 
@@ -37,9 +42,25 @@ import (
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
-var cfg *rest.Config
-var k8sClient client.Client
-var testEnv *envtest.Environment
+// Define utility constants for object names, testing timeouts/durations intervals, etc.
+const (
+	contourName       = "test-contour"
+	operatorNamespace = "test-contour-operator"
+	defaultNamespace  = "projectcontour"
+	defaultRemoveNs   = false
+	defaultReplicas   = int32(2)
+
+	timeout  = time.Second * 10
+	interval = time.Millisecond * 250
+)
+
+var (
+	cfg       *rest.Config
+	k8sClient client.Client
+	testEnv   *envtest.Environment
+	ctx       = context.Background()
+	image     = "docker.io/projectcontour/contour:latest"
+)
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -54,7 +75,7 @@ var _ = BeforeSuite(func(done Done) {
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths: []string{filepath.Join("..", "config", "crd", "bases")},
+		CRDDirectoryPaths: []string{filepath.Join("../../", "config", "crd", "bases")},
 	}
 
 	var err error
@@ -71,11 +92,44 @@ var _ = BeforeSuite(func(done Done) {
 	Expect(err).ToNot(HaveOccurred())
 	Expect(k8sClient).ToNot(BeNil())
 
+	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
+		Scheme: scheme.Scheme,
+	})
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&Reconciler{
+		Config: Config{
+			Image: image,
+		},
+		Client: k8sManager.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("Contour"),
+		Scheme: k8sManager.GetScheme(),
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	go func() {
+		err = k8sManager.Start(ctrl.SetupSignalHandler())
+		Expect(err).ToNot(HaveOccurred())
+	}()
+
+	k8sClient = k8sManager.GetClient()
+	Expect(k8sClient).ToNot(BeNil())
+
+	// Create the operator namespace.
+	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: operatorNamespace}}
+	err = k8sClient.Create(ctx, ns)
+	Expect(err).ToNot(HaveOccurred())
 	close(done)
 }, 60)
 
 var _ = AfterSuite(func() {
 	By("tearing down the test environment")
-	err := testEnv.Stop()
+	// Remove the operator namespace.
+	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: operatorNamespace}}
+	err := k8sClient.Delete(ctx, ns)
+	Expect(err).ToNot(HaveOccurred())
+
+	// Tear down the test environment.
+	err = testEnv.Stop()
 	Expect(err).ToNot(HaveOccurred())
 })
