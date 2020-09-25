@@ -1,0 +1,187 @@
+/*
+
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package contour
+
+import (
+	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
+	"time"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+)
+
+const (
+	testContourNs = "test-contour"
+	testNsSuffix  = "-ns"
+)
+
+var _ = Describe("Run controller", func() {
+
+	Context("When creating a contour", func() {
+		It("The spec namespace should be created", func() {
+			By("By creating a contour")
+
+			key := types.NamespacedName{
+				Name:      contourName + testNsSuffix,
+				Namespace: operatorNamespace,
+			}
+
+			// Create a contour
+			created := &operatorv1alpha1.Contour{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: key.Namespace,
+					Name:      key.Name,
+				},
+				Spec: operatorv1alpha1.ContourSpec{
+					Namespace: operatorv1alpha1.NamespaceSpec{
+						Name:             testContourNs,
+						RemoveOnDeletion: true,
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, created)).Should(Succeed())
+
+			// Check the namespace
+			Eventually(func() error {
+				f := &corev1.Namespace{}
+				k := types.NamespacedName{
+					Name: testContourNs,
+				}
+				return k8sClient.Get(ctx, k, f)
+			}, timeout, interval).Should(Succeed())
+
+			// Delete the contour
+			By("By deleting contour successfully")
+			Expect(k8sClient.Delete(ctx, created)).Should(Succeed())
+
+			// Update the contour
+			/*updated := &operatorv1alpha1.Contour{}
+			Expect(k8sClient.Get(ctx, key, updated)).Should(Succeed())
+			updatedNs := testContourNs + "-updated"
+			updated.Spec.Namespace.Name = updatedNs
+			Expect(k8sClient.Update(ctx, updated)).Should(Succeed())*/
+
+			// Check the initial namespace
+			f := &corev1.Namespace{}
+			k := types.NamespacedName{
+				Name: testContourNs,
+			}
+			time.Sleep(30 * time.Second)
+			err := k8sClient.Get(ctx, k, f)
+			Expect(err).Should(HaveOccurred())
+
+			// Check the updated namespace
+			/*Eventually(func() error {
+				f := &corev1.Namespace{}
+				k := types.NamespacedName{
+					Name: updatedNs,
+				}
+				return k8sClient.Get(ctx, k, f)
+			}, timeout, interval).Should(Succeed())
+
+			// Delete the contour
+			By("Expecting to delete contour successfully")
+			Expect(k8sClient.Delete(ctx, created)).Should(Succeed())
+
+			// Check the initial namespace
+			Eventually(func() error {
+				f := &corev1.Namespace{}
+				k := types.NamespacedName{
+					Name: testContourNs,
+				}
+				return k8sClient.Get(ctx, k, f)
+			}, timeout, interval).ShouldNot(Succeed())
+
+			// Check the updated namespace
+			Eventually(func() error {
+				f := &corev1.Namespace{}
+				k := types.NamespacedName{
+					Name: updatedNs,
+				}
+				return k8sClient.Get(ctx, k, f)
+			}, timeout, interval).ShouldNot(Succeed())
+
+			// Delete the initial namespace
+			Eventually(func() error {
+				f := &corev1.Namespace{}
+				f.Name = testContourNs
+				return k8sClient.Delete(ctx, f)
+			}, timeout, interval).Should(Succeed())
+
+			// Delete the updated namespace
+			Eventually(func() error {
+				f := &corev1.Namespace{}
+				f.Name = updatedNs
+				return k8sClient.Delete(ctx, f)
+			}, timeout, interval).Should(Succeed())*/
+		})
+	})
+
+	/*Context("When creating a contour", func() {
+		It("The namespace should be removed when removeOnDeletion is set", func() {
+			By("By creating a contour")
+
+			cntrName := contourName + testNsSuffix + "-deletion"
+			specNsName := testContourNs + "-deletion"
+			key := types.NamespacedName{
+				Name:      cntrName,
+				Namespace: operatorNamespace,
+			}
+
+			// Create a contour
+			created := &operatorv1alpha1.Contour{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: key.Namespace,
+					Name:      key.Name,
+				},
+				Spec: operatorv1alpha1.ContourSpec{
+					Namespace: operatorv1alpha1.NamespaceSpec{
+						Name:             specNsName,
+						RemoveOnDeletion: true,
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, created)).Should(Succeed())
+
+			// Check the namespace
+			Eventually(func() error {
+				f := &corev1.Namespace{}
+				k := types.NamespacedName{
+					Name: specNsName,
+				}
+				return k8sClient.Get(ctx, k, f)
+			}, timeout, interval).Should(Succeed())
+
+			// Delete the contour
+			By("By deleting contour successfully")
+			Expect(k8sClient.Delete(ctx, created)).Should(Succeed())
+
+			// Check the namespace
+			Eventually(func() error {
+				f := &corev1.Namespace{}
+				k := types.NamespacedName{
+					Name: specNsName,
+				}
+				return k8sClient.Get(ctx, k, f)
+			}, timeout, interval).ShouldNot(Succeed())
+		})
+	})*/
+})
