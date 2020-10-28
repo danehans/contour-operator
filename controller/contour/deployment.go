@@ -70,25 +70,30 @@ const (
 )
 
 // ensureDeployment ensures a deployment exists for the given contour.
-func (r *Reconciler) ensureDeployment(ctx context.Context, contour *operatorv1alpha1.Contour) error {
+func (r *Reconciler) ensureDeployment(ctx context.Context, contour *operatorv1alpha1.Contour) (*appsv1.Deployment, error) {
 	desired, err := DesiredDeployment(contour, r.Config.ContourImage)
 	if err != nil {
-		return fmt.Errorf("failed to build deployment: %w", err)
+		return nil, fmt.Errorf("failed to build deployment: %w", err)
 	}
 
 	current, err := r.currentDeployment(ctx, contour)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return r.createDeployment(ctx, desired)
+			updated, err := r.createDeployment(ctx, desired)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create deployment %s/%s: %w", desired.Namespace, desired.Name, err)
+			}
+			return updated, nil
 		}
-		return fmt.Errorf("failed to get deployment %s/%s: %w", desired.Namespace, desired.Name, err)
+		return nil, fmt.Errorf("failed to get deployment %s/%s: %w", desired.Namespace, desired.Name, err)
 	}
 
-	if err := r.updateDeploymentIfNeeded(ctx, current, desired); err != nil {
-		return fmt.Errorf("failed to update deployment %s/%s: %w", desired.Namespace, desired.Name, err)
+	updated, err := r.updateDeploymentIfNeeded(ctx, current, desired)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update deployment %s/%s: %w", desired.Namespace, desired.Name, err)
 	}
 
-	return nil
+	return updated, nil
 }
 
 // ensureDeploymentDeleted ensures the deployment for the provided contour
@@ -339,27 +344,27 @@ func (r *Reconciler) currentDeployment(ctx context.Context, contour *operatorv1a
 }
 
 // createDeployment creates a Deployment resource for the provided deploy.
-func (r *Reconciler) createDeployment(ctx context.Context, deploy *appsv1.Deployment) error {
+func (r *Reconciler) createDeployment(ctx context.Context, deploy *appsv1.Deployment) (*appsv1.Deployment, error) {
 	if err := r.Client.Create(ctx, deploy); err != nil {
-		return fmt.Errorf("failed to create deployment %s/%s: %w", deploy.Namespace, deploy.Name, err)
+		return nil, fmt.Errorf("failed to create deployment %s/%s: %w", deploy.Namespace, deploy.Name, err)
 	}
 	r.Log.Info("created deployment", "namespace", deploy.Namespace, "name", deploy.Name)
 
-	return nil
+	return deploy, nil
 }
 
 // updateDeploymentIfNeeded updates a Deployment if current does not match desired.
-func (r *Reconciler) updateDeploymentIfNeeded(ctx context.Context, current, desired *appsv1.Deployment) error {
+func (r *Reconciler) updateDeploymentIfNeeded(ctx context.Context, current, desired *appsv1.Deployment) (*appsv1.Deployment, error) {
 	deploy, updated := utilequality.DeploymentConfigChanged(current, desired)
 	if updated {
 		if err := r.Client.Update(ctx, deploy); err != nil {
-			return fmt.Errorf("failed to update deployment %s/%s: %w", deploy.Namespace, deploy.Name, err)
+			return nil, fmt.Errorf("failed to update deployment %s/%s: %w", deploy.Namespace, deploy.Name, err)
 		}
 		r.Log.Info("updated deployment", "namespace", deploy.Namespace, "name", deploy.Name)
-		return nil
+		return deploy, nil
 	}
 	r.Log.Info("deployment unchanged; skipped updating deployment",
 		"namespace", current.Namespace, "name", current.Name)
 
-	return nil
+	return current, nil
 }

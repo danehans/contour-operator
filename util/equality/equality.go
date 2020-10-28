@@ -209,3 +209,16 @@ func LoadBalancerServiceChanged(current, expected *corev1.Service) (*corev1.Serv
 
 	return updated, true
 }
+
+// ContourStatusChanged checks if current and expected match and if not,
+// returns true.
+func ContourStatusChanged(current, expected operatorv1alpha1.ContourStatus) bool {
+	if current.AvailableReplicas != expected.AvailableReplicas {
+		return true
+	}
+	if !apiequality.Semantic.DeepEqual(current.Conditions, expected.Conditions) {
+		return true
+	}
+
+	return false
+}

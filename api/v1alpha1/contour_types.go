@@ -83,11 +83,62 @@ type NamespaceSpec struct {
 	RemoveOnDeletion bool `json:"removeOnDeletion,omitempty"`
 }
 
+const (
+	// Available indicates that the contour is running and available.
+	ContourAvailableConditionType = "Available"
+
+	// Progressing indicates that the contour is actively transitioning
+	// from one steady state to another, e.g. propagating a configuration
+	// change. Progressing should not be reported when reconciling a
+	// previously known state.
+	ContourProgressingConditionType = "Progressing"
+
+	// Degraded indicates that the contour's current state does not
+	// match its desired state over a period of time resulting in a
+	// lower quality of service. Degraded state represents persistent
+	// observation of a condition. As a result, a contour should not
+	// oscillate in and out of the Degraded state. A contour may be
+	// Available even if its Degraded. For example, a contour may
+	// desire 2 running Contour pods, but 1 pod is crash-looping.
+	// The contour is Available but Degraded because it may have a
+	// lower quality of service. A contour may be Progressing but not
+	// Degraded because the transition from one state to another does
+	// not persist over a long enough period to report Degraded.
+	// A contour should not report Degraded during the course of a normal
+	// upgrade. A contour may report Degraded in response to a persistent
+	// infrastructure failure that requires administrator intervention.
+	// For example, if a cluster node is unhealthy and the cluster does
+	// not contain enough nodes to run the desired number of Contour
+	// replicas.
+	ContourDegradedConditionType = "Degraded"
+
+	// Unknown indicates that the contour's current state can not be
+	// determined.
+	ContourUnknownConditionType = "Unknown"
+)
+
 // ContourStatus defines the observed state of Contour.
 type ContourStatus struct {
-	// availableReplicas is the number of observed available Contour replicas
-	// according to the deployment.
+	// availableReplicas is the number of observed available Contour
+	// replicas according to the deployment.
 	AvailableReplicas int32 `json:"availableReplicas"`
+
+	// availablePods is the number of observed available Envoy pods.
+	AvailablePods int32 `json:"availablePods"`
+
+	// availableSecrets is a list of available TLS secrets for the contour
+	// represented as namespace/secret name.
+	AvailableSecrets []string `json:"availableSecrets"`
+
+	// Conditions represent the observations of a contour's current state.
+	// Known condition types are "Available", "Progressing", and "Degraded".
+	// Reference the condition types for additional details.
+	//
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 func init() {

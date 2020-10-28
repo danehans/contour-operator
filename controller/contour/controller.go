@@ -137,10 +137,12 @@ func (r *Reconciler) ensureContour(ctx context.Context, contour *operatorv1alpha
 	if err := r.ensureJob(ctx, contour); err != nil {
 		return fmt.Errorf("failed to ensure job for contour %s/%s: %w", contour.Namespace, contour.Name, err)
 	}
-	if err := r.ensureDeployment(ctx, contour); err != nil {
+	deploy, err := r.ensureDeployment(ctx, contour)
+	if err != nil {
 		return fmt.Errorf("failed to ensure deployment for contour %s/%s: %w", contour.Namespace, contour.Name, err)
 	}
-	if err := r.ensureDaemonSet(ctx, contour); err != nil {
+	ds, err := r.ensureDaemonSet(ctx, contour)
+	if err != nil {
 		return fmt.Errorf("failed to ensure daemonset for contour %s/%s: %w", contour.Namespace, contour.Name, err)
 	}
 	if err := r.ensureContourService(ctx, contour); err != nil {
@@ -148,6 +150,9 @@ func (r *Reconciler) ensureContour(ctx context.Context, contour *operatorv1alpha
 	}
 	if err := r.ensureEnvoyService(ctx, contour); err != nil {
 		return fmt.Errorf("failed to ensure service for contour %s/%s: %w", contour.Namespace, contour.Name, err)
+	}
+	if err := r.syncContourStatus(ctx, contour, deploy, ds); err != nil {
+		return fmt.Errorf("failed to sync status for contour %s/%s: %w", contour.Namespace, contour.Name, err)
 	}
 	return nil
 }
