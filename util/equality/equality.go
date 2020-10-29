@@ -216,6 +216,16 @@ func ContourStatusChanged(current, expected operatorv1alpha1.ContourStatus) bool
 	if current.AvailableReplicas != expected.AvailableReplicas {
 		return true
 	}
+
+	if current.AvailableReplicas != expected.AvailableReplicas {
+		return true
+	}
+
+	if !apiequality.Semantic.DeepEqual(current.AvailableSecrets, expected.AvailableSecrets) {
+		return true
+	}
+
+
 	if !apiequality.Semantic.DeepEqual(current.Conditions, expected.Conditions) {
 		return true
 	}

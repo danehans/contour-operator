@@ -15,10 +15,12 @@ package main
 
 import (
 	"flag"
+	appsv1 "k8s.io/api/apps/v1"
 	"os"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	contourcontroller "github.com/projectcontour/contour-operator/controller/contour"
+	deploycontroller "github.com/projectcontour/contour-operator/controller/deployment"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -83,6 +85,19 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Contour")
 		os.Exit(1)
 	}
+
+	ctrl.NewControllerManagedBy(mgr).
+		For(&appsv1.Deployment{}).
+		Owns(&appsv1.Deployment{}).
+		Complete(&deploycontroller.Reconciler{
+			Config: deploycontroller.Config{
+				ContourImage: contourImage,
+				EnvoyImage:   envoyImage,
+			},
+			Client: mgr.GetClient(),
+			Log:    ctrl.Log.WithName("controllers").WithName("Deployment"),
+			Scheme: mgr.GetScheme(),
+	})
 	// +kubebuilder:scaffold:builder
 
 	setupLog.Info("starting contour-operator")
