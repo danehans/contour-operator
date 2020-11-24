@@ -17,31 +17,17 @@ import (
 	"flag"
 	"os"
 
-	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
+	operatorclient "github.com/projectcontour/contour-operator/client"
 	contourcontroller "github.com/projectcontour/contour-operator/controller/contour"
-	"github.com/projectcontour/contour-operator/controller/manager"
 
-	"k8s.io/apimachinery/pkg/runtime"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"github.com/projectcontour/contour-operator/controller/manager"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	// +kubebuilder:scaffold:imports
 )
 
 var (
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
-)
-
-func init() {
-	_ = clientgoscheme.AddToScheme(scheme)
-
-	_ = operatorv1alpha1.AddToScheme(scheme)
-	// +kubebuilder:scaffold:scheme
-}
-
-var (
+	setupLog             = ctrl.Log.WithName("setup")
 	contourImage         string
 	envoyImage           string
 	metricsAddr          string
@@ -62,7 +48,7 @@ func main() {
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 
 	mgrOpts := ctrl.Options{
-		Scheme:             scheme,
+		Scheme:             operatorclient.GetScheme(),
 		MetricsBindAddress: metricsAddr,
 		LeaderElection:     enableLeaderElection,
 		LeaderElectionID:   "0d879e31.projectcontour.io",
