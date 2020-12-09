@@ -15,6 +15,9 @@ package main
 
 import (
 	"flag"
+	"log"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
@@ -82,6 +85,11 @@ func main() {
 	}
 
 	// +kubebuilder:scaffold:builder
+
+	go func() {
+		setupLog.Info("serving pprof")
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
 
 	setupLog.Info("starting contour-operator")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
