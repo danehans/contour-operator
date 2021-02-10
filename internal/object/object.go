@@ -233,3 +233,39 @@ func TagFromImage(image string) string {
 	}
 	return ""
 }
+
+// GetPodLogs...
+/*func GetPodLogs(ctx context.Context, cli client.Client, ns string, pod string, container string) error {
+	count := int64(100)
+	podLogOptions := corev1.PodLogOptions{
+		Container: container,
+		TailLines: &count,
+	}
+
+	cli.Get()
+	podLogRequest := clientSet.CoreV1().
+		Pods(ns).
+		GetLogs(pod, &podLogOptions)
+	stream, err := podLogRequest.Stream(context.TODO())
+	if err != nil {
+		return err
+	}
+	defer stream.Close()
+
+	for {
+		buf := make([]byte, 2000)
+		numBytes, err := stream.Read(buf)
+		if numBytes == 0 {
+			continue
+		}
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		message := string(buf[:numBytes])
+		fmt.Print(message)
+	}
+	return nil
+}*/

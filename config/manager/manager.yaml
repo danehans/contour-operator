@@ -25,7 +25,7 @@ spec:
         args:
         - --enable-leader-election
         image: contour-operator
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         name: contour-operator
         resources:
           requests:

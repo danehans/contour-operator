@@ -2737,7 +2737,7 @@ spec:
         - --envoy-image
         - docker.io/envoyproxy/envoy:v1.17.0
         image: docker.io/projectcontour/contour-operator:main
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         name: contour-operator
         resources:
           requests:

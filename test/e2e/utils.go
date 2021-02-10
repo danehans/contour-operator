@@ -16,23 +16,14 @@
 package e2e
 
 import (
-	"context"
 	"fmt"
-	"net/http"
-	"reflect"
-	"time"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	objutil "github.com/projectcontour/contour-operator/internal/object"
 	operatorconfig "github.com/projectcontour/contour-operator/internal/operator/config"
 
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -56,6 +47,11 @@ func newClient() (client.Client, error) {
 		return nil, fmt.Errorf("failed to create kube client: %v\n", err)
 	}
 	return kubeClient, nil
+}
+
+func newClientSet() (kubernetes.Clientset, error) {
+	rest.
+	return kubernetes.NewForConfig(config.GetConfigOrDie())
 }
 
 func newContour(ctx context.Context, cl client.Client, name, ns, specNs string, remove bool, pubType operatorv1alpha1.NetworkPublishingType) (*operatorv1alpha1.Contour, error) {
