@@ -17,6 +17,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	objgw "github.com/projectcontour/contour-operator/internal/objects/gateway"
+	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 	"text/template"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
@@ -44,9 +46,9 @@ var contourCfgTemplate = template.Must(template.New("contour.yaml").Parse(`
 #   xds-server-type: contour
 #
 # Specify the service-apis Gateway Contour should watch.
-# gateway:
-#   name: contour
-#   namespace: projectcontour
+gateway:
+  name: {{.GatewayName}}
+  namespace: {{.GatewayNamespace}}
 #
 # should contour expect to be running inside a k8s cluster
 # incluster: true
@@ -141,19 +143,19 @@ accesslog-format: envoy
 `))
 
 // EnsureConfigMap ensures that a ConfigMap exists for the given contour.
-func EnsureConfigMap(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) error {
-	desired, err := desiredConfigMap(contour)
+func EnsureConfigMap(ctx context.Context, cli client.Client, obj client.Object) error {
+	desired, err := desiredConfigMap(obj)
 	if err != nil {
 		return fmt.Errorf("failed to build configmap: %w", err)
 	}
-	current, err := currentConfigMap(ctx, cli, contour)
+	current, err := currentConfigMap(ctx, cli, obj)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return createConfigMap(ctx, cli, desired)
 		}
 		return fmt.Errorf("failed to get configmap %s/%s: %w", desired.Namespace, desired.Name, err)
 	}
-	if err := updateConfigMapIfNeeded(ctx, cli, contour, current, desired); err != nil {
+	if err := updateConfigMapIfNeeded(ctx, cli, obj, current, desired); err != nil {
 		return fmt.Errorf("failed to update configmap %s/%s: %w", desired.Namespace, desired.Name, err)
 	}
 	return nil
@@ -180,12 +182,12 @@ func EnsureConfigMapDeleted(ctx context.Context, cli client.Client, contour *ope
 	return nil
 }
 
-// currentConfigMap gets the ConfigMap for contour from the api server.
-func currentConfigMap(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) (*corev1.ConfigMap, error) {
+// currentConfigMap gets the ConfigMap for the provided ns/name from the api server.
+func currentConfigMap(ctx context.Context, cli client.Client, ns, name string) (*corev1.ConfigMap, error) {
 	current := &corev1.ConfigMap{}
 	key := types.NamespacedName{
-		Namespace: contour.Spec.Namespace.Name,
-		Name:      ContourCfgMapName,
+		Namespace: ns,
+		Name:      name,
 	}
 	err := cli.Get(ctx, key, current)
 	if err != nil {
@@ -194,17 +196,32 @@ func currentConfigMap(ctx context.Context, cli client.Client, contour *operatorv
 	return current, nil
 }
 
-// desiredConfigMap generates the desired ConfigMap for the given contour.
-func desiredConfigMap(contour *operatorv1alpha1.Contour) (*corev1.ConfigMap, error) {
-	cfgFile := new(bytes.Buffer)
-
-	accessLogFormat := "envoy"
+// desiredConfigMap generates the desired ConfigMap for the given contour and gateway.
+func desiredConfigMap(obj client.Object) (*corev1.ConfigMap, error) {
 	cfgFileParameters := struct {
-		AccessLogFormat string
+		GatewayName      string
+		GatewayNamespace string
 	}{
-		AccessLogFormat: accessLogFormat,
+		// Contour configmap default settings.
+		GatewayName:      "contour",
+		GatewayNamespace: "projectcontour",
 	}
 
+	var specNs string
+	kind := obj.GetObjectKind().GroupVersionKind().Kind
+	switch kind {
+	case objgw.KindGateway:
+		specNs = obj.GetNamespace()
+		cfgFileParameters.GatewayName = obj.GetName()
+		cfgFileParameters.GatewayNamespace = obj.GetNamespace()
+	case operatorv1alpha1.GroupVersionKind.Kind:
+		contour := obj.(*operatorv1alpha1.Contour)
+		specNs = contour.Spec.Namespace.Name
+	default:
+		return nil, fmt.Errorf("unknown kind")
+	}
+
+	cfgFile := new(bytes.Buffer)
 	if err := contourCfgTemplate.Execute(cfgFile, cfgFileParameters); err != nil {
 		return nil, err
 	}
@@ -212,10 +229,10 @@ func desiredConfigMap(contour *operatorv1alpha1.Contour) (*corev1.ConfigMap, err
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ContourCfgMapName,
-			Namespace: contour.Spec.Namespace.Name,
+			Namespace: specNs,
 			Labels: map[string]string{
-				operatorv1alpha1.OwningContourNameLabel: contour.Name,
-				operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
+				operatorv1alpha1.OwningContourNameLabel: obj.GetName(),
+				operatorv1alpha1.OwningContourNsLabel:   obj.GetNamespace(),
 			},
 		},
 		Data: map[string]string{

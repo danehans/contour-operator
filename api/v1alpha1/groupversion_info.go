@@ -25,6 +25,9 @@ var (
 	// GroupVersion is group version used to register these objects
 	GroupVersion = schema.GroupVersion{Group: "operator.projectcontour.io", Version: "v1alpha1"}
 
+	// GroupVersionKind is group, version and kind used to register these objects
+	GroupVersionKind = schema.GroupVersionKind{Group: "operator.projectcontour.io", Version: "v1alpha1", Kind: "Contour"}
+
 	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
 	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}
 

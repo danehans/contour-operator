@@ -183,7 +183,7 @@ func (r *reconciler) ensureGateway(ctx context.Context, gw *gatewayv1alpha1.Gate
 		r.log.Info("ensured rbac for contour", "namespace", contour.Namespace, "name", contour.Name)
 	}
 	if len(errs) == 0 {
-		if err := objcm.EnsureConfigMap(ctx, cli, contour); err != nil {
+		if err := objcm.EnsureConfigMap(ctx, cli, gw); err != nil {
 			errs = append(errs, fmt.Errorf("failed to ensure configmap for contour %s/%s: %w", contour.Namespace, contour.Name, err))
 		} else {
 			r.log.Info("ensured configmap for contour", "namespace", contour.Namespace, "name", contour.Name)

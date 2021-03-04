@@ -26,6 +26,8 @@ import (
 	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
 
+const KindGateway = "Gateway"
+
 // OwnerLabelsExist returns true if obj contains Gateway owner labels.
 func OwnerLabelsExist(obj metav1.Object, gw *gatewayv1alpha1.Gateway) bool {
 	labels := obj.GetLabels()
