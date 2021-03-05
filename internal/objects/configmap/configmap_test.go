@@ -19,9 +19,11 @@ import (
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
+
+	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
 
-func TestDesiredDNSConfigmap(t *testing.T) {
+func TestDesiredConfigmap(t *testing.T) {
 	expectedCfgfile := `
 #
 # server:
@@ -29,9 +31,9 @@ func TestDesiredDNSConfigmap(t *testing.T) {
 #   xds-server-type: contour
 #
 # Specify the service-apis Gateway Contour should watch.
-# gateway:
-#   name: contour
-#   namespace: projectcontour
+gateway:
+  name: contour
+  namespace: projectcontour
 #
 # should contour expect to be running inside a k8s cluster
 # incluster: true
@@ -133,7 +135,8 @@ accesslog-format: envoy
 		NetworkType: operatorv1alpha1.LoadBalancerServicePublishingType,
 	}
 	cntr := objcontour.New(cfg)
-	if cm, err := desiredConfigMap(cntr); err != nil {
+	gw := &gatewayv1alpha1.Gateway{}
+	if cm, err := desiredGatewayConfigMap(cntr, gw); err != nil {
 		t.Errorf("invalid contour configmap: %v", err)
 	} else if cm.Data["contour.yaml"] != expectedCfgfile {
 		t.Errorf("unexpected contour.yaml; got:\n%s\nexpected:\n%s\n", cm.Data["contour.yaml"], expectedCfgfile)

@@ -183,10 +183,12 @@ func (r *reconciler) ensureGateway(ctx context.Context, gw *gatewayv1alpha1.Gate
 		r.log.Info("ensured rbac for contour", "namespace", contour.Namespace, "name", contour.Name)
 	}
 	if len(errs) == 0 {
-		if err := objcm.EnsureConfigMap(ctx, cli, contour); err != nil {
-			errs = append(errs, fmt.Errorf("failed to ensure configmap for contour %s/%s: %w", contour.Namespace, contour.Name, err))
+		if err := objcm.EnsureConfigMap(ctx, cli, gw); err != nil {
+			kind := gw.GetObjectKind().GroupVersionKind().Kind
+			r.log.Info("object is", "kind", kind)
+			errs = append(errs, fmt.Errorf("failed to ensure configmap for gateway %s/%s: %w", gw.Namespace, gw.Name, err))
 		} else {
-			r.log.Info("ensured configmap for contour", "namespace", contour.Namespace, "name", contour.Name)
+			r.log.Info("ensured configmap for gateway", "namespace", gw.Namespace, "name", gw.Name)
 		}
 		contourImage := r.config.ContourImage
 		if err := objjob.EnsureJob(ctx, cli, contour, contourImage); err != nil {
@@ -259,11 +261,13 @@ func (r *reconciler) ensureGatewayDeleted(ctx context.Context, gw *gatewayv1alph
 	} else {
 		r.log.Info("deleted job for contour", "namespace", contour.Namespace, "name", contour.Name)
 	}
-	if err := objcm.EnsureConfigMapDeleted(ctx, cli, contour); err != nil {
-		errs = append(errs, fmt.Errorf("failed to delete configmap for contour %s/%s: %w",
-			contour.Namespace, contour.Name, err))
+	if err := objcm.EnsureConfigMapDeleted(ctx, cli, gw); err != nil {
+		kind := gw.GetObjectKind().GroupVersionKind().Kind
+		r.log.Info("object is", "kind", kind)
+		errs = append(errs, fmt.Errorf("failed to delete configmap for gateway %s/%s: %w",
+			gw.Namespace, gw.Name, err))
 	} else {
-		r.log.Info("deleted configmap for contour", "namespace", contour.Namespace, "name", contour.Name)
+		r.log.Info("deleted configmap for gateway", "namespace", gw.Namespace, "name", gw.Name)
 	}
 	if err := objutil.EnsureRBACDeleted(ctx, cli, contour); err != nil {
 		errs = append(errs, fmt.Errorf("failed to delete rbac for contour %s/%s: %w", contour.Namespace, contour.Name, err))

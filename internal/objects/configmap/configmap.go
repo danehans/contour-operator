@@ -17,17 +17,18 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	objgw "github.com/projectcontour/contour-operator/internal/objects/gateway"
 	"text/template"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
-
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
 
 const (
@@ -44,9 +45,9 @@ var contourCfgTemplate = template.Must(template.New("contour.yaml").Parse(`
 #   xds-server-type: contour
 #
 # Specify the service-apis Gateway Contour should watch.
-# gateway:
-#   name: contour
-#   namespace: projectcontour
+gateway:
+  name: {{.GatewayName}}
+  namespace: {{.GatewayNamespace}}
 #
 # should contour expect to be running inside a k8s cluster
 # incluster: true
@@ -141,12 +142,39 @@ accesslog-format: envoy
 `))
 
 // EnsureConfigMap ensures that a ConfigMap exists for the given contour.
-func EnsureConfigMap(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) error {
-	desired, err := desiredConfigMap(contour)
+func EnsureConfigMap(ctx context.Context, cli client.Client, obj client.Object) error {
+	var contour *operatorv1alpha1.Contour
+	var gw *gatewayv1alpha1.Gateway
+	//kind := obj.GetObjectKind().GroupVersionKind().Kind
+	//contour = obj.(*operatorv1alpha1.Contour)
+	var err error
+	gw = obj.(*gatewayv1alpha1.Gateway)
+	contour, err = objgw.ContourForGateway(ctx, cli, gw)
+	if err != nil {
+		return fmt.Errorf("failed to get contour for gateway %s/%s: %w", gw.Namespace, gw.Name, err)
+	}
+	/*switch kind {
+	//case objgw.KindGateway:
+	case "Gateway":
+		var err error
+		gw = obj.(*gatewayv1alpha1.Gateway)
+		contour, err = objgw.ContourForGateway(ctx, cli, gw)
+		if err != nil {
+			return fmt.Errorf("failed to get contour for gateway %s/%s: %w", gw.Namespace, gw.Name, err)
+		}
+	//case operatorv1alpha1.GroupVersionKind.Kind:
+	case "Contour":
+		contour = obj.(*operatorv1alpha1.Contour)
+	default:
+		return fmt.Errorf("unknown kind %s", kind)
+	}*/
+
+	desired, err := desiredGatewayConfigMap(contour, gw)
 	if err != nil {
 		return fmt.Errorf("failed to build configmap: %w", err)
 	}
-	current, err := currentConfigMap(ctx, cli, contour)
+	//current, err := currentConfigMap(ctx, cli, contour)
+	current, err := currentGatewayConfigMap(ctx, cli, gw)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return createConfigMap(ctx, cli, desired)
@@ -161,7 +189,34 @@ func EnsureConfigMap(ctx context.Context, cli client.Client, contour *operatorv1
 
 // EnsureConfigMapDeleted ensures the configmap for the provided contour
 // is deleted if Contour owner labels exist.
-func EnsureConfigMapDeleted(ctx context.Context, cli client.Client, contour *operatorv1alpha1.Contour) error {
+func EnsureConfigMapDeleted(ctx context.Context, cli client.Client, obj client.Object) error {
+	var contour *operatorv1alpha1.Contour
+	var gw *gatewayv1alpha1.Gateway
+	//kind := obj.GetObjectKind().GroupVersionKind().Kind
+	//contour = obj.(*operatorv1alpha1.Contour)
+	var err error
+	gw = obj.(*gatewayv1alpha1.Gateway)
+	contour, err = objgw.ContourForGateway(ctx, cli, gw)
+	if err != nil {
+		return fmt.Errorf("failed to get contour for gateway %s/%s: %w", gw.Namespace, gw.Name, err)
+	}
+
+	/*switch kind {
+	//case objgw.KindGateway:
+	case "Gateway":
+		var err error
+		gw = obj.(*gatewayv1alpha1.Gateway)
+		contour, err = objgw.ContourForGateway(ctx, cli, gw)
+		if err != nil {
+			return fmt.Errorf("failed to get contour for gateway %s/%s: %w", gw.Namespace, gw.Name, err)
+		}
+	//case operatorv1alpha1.GroupVersionKind.Kind:
+	case "Contour":
+		contour = obj.(*operatorv1alpha1.Contour)
+	default:
+		return fmt.Errorf("unknown kind %s", kind)
+	}*/
+
 	cfgMap, err := currentConfigMap(ctx, cli, contour)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -194,25 +249,47 @@ func currentConfigMap(ctx context.Context, cli client.Client, contour *operatorv
 	return current, nil
 }
 
-// desiredConfigMap generates the desired ConfigMap for the given contour.
-func desiredConfigMap(contour *operatorv1alpha1.Contour) (*corev1.ConfigMap, error) {
-	cfgFile := new(bytes.Buffer)
+// currentGatewayConfigMap gets the ConfigMap for gw from the api server.
+func currentGatewayConfigMap(ctx context.Context, cli client.Client, gw *gatewayv1alpha1.Gateway) (*corev1.ConfigMap, error) {
+	current := &corev1.ConfigMap{}
+	key := types.NamespacedName{
+		Namespace: gw.Namespace,
+		Name:      ContourCfgMapName,
+	}
+	err := cli.Get(ctx, key, current)
+	if err != nil {
+		return nil, err
+	}
+	return current, nil
+}
 
-	accessLogFormat := "envoy"
-	cfgFileParameters := struct {
-		AccessLogFormat string
+// desiredGatewayConfigMap generates the desired ConfigMap for the given gw.
+func desiredGatewayConfigMap(contour *operatorv1alpha1.Contour, gw *gatewayv1alpha1.Gateway) (*corev1.ConfigMap, error) {
+	params := struct {
+		GatewayName      string
+		GatewayNamespace string
 	}{
-		AccessLogFormat: accessLogFormat,
+		// Contour configmap default settings.
+		GatewayName:      "contour",
+		GatewayNamespace: "projectcontour",
 	}
 
-	if err := contourCfgTemplate.Execute(cfgFile, cfgFileParameters); err != nil {
+	specNs := contour.Spec.Namespace.Name
+	if gw != nil {
+		params.GatewayNamespace = gw.Namespace
+		params.GatewayName = gw.Name
+		specNs = gw.Namespace
+	}
+
+	cfgFile := new(bytes.Buffer)
+	if err := contourCfgTemplate.Execute(cfgFile, params); err != nil {
 		return nil, err
 	}
 
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ContourCfgMapName,
-			Namespace: contour.Spec.Namespace.Name,
+			Namespace: specNs,
 			Labels: map[string]string{
 				operatorv1alpha1.OwningContourNameLabel: contour.Name,
 				operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
