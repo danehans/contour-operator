@@ -274,8 +274,19 @@ func DesiredEnvoyService(contour *operatorv1alpha1.Contour) *corev1.Service {
 		}
 	case operatorv1alpha1.NodePortServicePublishingType:
 		svc.Spec.Type = corev1.ServiceTypeNodePort
-		svc.Spec.Ports[0].NodePort = EnvoyNodePortHTTPPort
-		svc.Spec.Ports[1].NodePort = EnvoyNodePortHTTPSPort
+		if contour.Spec.NetworkPublishing.Envoy.NodePorts != nil {
+			for _, port := range contour.Spec.NetworkPublishing.Envoy.NodePorts {
+				if port.Name == "http" {
+					svc.Spec.Ports[0].NodePort = port.PortNumber
+				}
+				if port.Name == "https" {
+					svc.Spec.Ports[1].NodePort = port.PortNumber
+				}
+			}
+		} else {
+			svc.Spec.Ports[0].NodePort = EnvoyNodePortHTTPPort
+			svc.Spec.Ports[1].NodePort = EnvoyNodePortHTTPSPort
+		}
 	case operatorv1alpha1.ClusterIPServicePublishingType:
 		svc.Spec.Type = corev1.ServiceTypeClusterIP
 	}

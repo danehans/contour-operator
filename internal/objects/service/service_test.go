@@ -153,6 +153,21 @@ func TestDesiredEnvoyService(t *testing.T) {
 	checkServiceHasPortName(t, svc, "http")
 	checkServiceHasPortName(t, svc, "https")
 	checkServiceHasPortProtocol(t, svc, corev1.ProtocolTCP)
+	//Check non-default nodeports.
+	ports := []operatorv1alpha1.NodePort{
+		{
+			Name:       "http",
+			PortNumber: int32(123),
+		},
+		{
+			Name:       "https",
+			PortNumber: int32(456),
+		},
+	}
+	cntr.Spec.NetworkPublishing.Envoy.NodePorts = ports
+	svc = DesiredEnvoyService(cntr)
+	checkServiceHasNodeport(t, svc, int32(123))
+	checkServiceHasNodeport(t, svc, int32(456))
 	// Check LB annotations for the different provider types.
 	cntr.Spec.NetworkPublishing.Envoy.Type = operatorv1alpha1.LoadBalancerServicePublishingType
 	cntr.Spec.NetworkPublishing.Envoy.LoadBalancer.Scope = operatorv1alpha1.ExternalLoadBalancer

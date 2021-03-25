@@ -1,0 +1,16 @@
+apiVersion: operator.projectcontour.io/v1alpha1
+kind: Contour
+metadata:
+  name: contour-sample-2
+spec:
+  namespace:
+    removeOnDeletion: true
+    name: projectcontour-2
+  networkPublishing:
+    envoy:
+      type: NodePortService
+      nodePorts:
+        - name: "http"
+          portNumber: 30081
+        - name: "https"
+          portNumber: 30444

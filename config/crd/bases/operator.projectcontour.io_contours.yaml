@@ -145,6 +145,29 @@ spec:
                             - External
                             type: string
                         type: object
+                      nodePorts:
+                        description: NodePorts is a list of nodeports. This field is ignored for all types other than NodePortService. Names and port numbers must be unique in the list. Two ports must be specified, one named "http" for Envoy's insecure service and one named "https" for Envoy's secure service.
+                        items:
+                          description: 'NodePort is the schema for a nodeport. For additional details see: https://kubernetes.io/docs/concepts/services-networking/service/#nodeport'
+                          properties:
+                            name:
+                              description: Name is an IANA_SVC_NAME within the pod.
+                              maxLength: 253
+                              minLength: 1
+                              type: string
+                            portNumber:
+                              description: PortNumber is the network port number to expose for the service port. The number must be greater than 0 and less than 65536.
+                              format: int32
+                              maximum: 65535
+                              minimum: 1
+                              type: integer
+                          required:
+                          - name
+                          - portNumber
+                          type: object
+                        maxItems: 2
+                        minItems: 2
+                        type: array
                       type:
                         default: LoadBalancerService
                         description: "Type is the type of publishing strategy to use. Valid values are: \n * LoadBalancerService \n In this configuration, network endpoints for Envoy use container networking. A Kubernetes LoadBalancer Service is created to publish Envoy network endpoints. The Service uses port 80 to publish Envoy's HTTP network endpoint and port 443 to publish Envoy's HTTPS network endpoint. \n See: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer \n * NodePortService \n Publishes Envoy network endpoints using a Kubernetes NodePort Service. \n In this configuration, Envoy network endpoints use container networking. A Kubernetes NodePort Service is created to publish the network endpoints. \n See: https://kubernetes.io/docs/concepts/services-networking/service/#nodeport \n * ClusterIPService \n Publishes Envoy network endpoints using a Kubernetes ClusterIP Service. \n In this configuration, Envoy network endpoints use container networking. A Kubernetes ClusterIP Service is created to publish the network endpoints. \n See: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types"

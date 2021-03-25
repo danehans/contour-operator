@@ -31,7 +31,17 @@ const gatewayClassNamespacedParamRef = "Namespace"
 
 // Contour returns true if contour is valid.
 func Contour(contour *operatorv1alpha1.Contour) error {
-	return containerPorts(contour)
+	if err := containerPorts(contour); err != nil {
+		return err
+	}
+	// Validate nodeports, if specified, for the NodePortService network publishing type.
+	if contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.NodePortServicePublishingType &&
+		contour.Spec.NetworkPublishing.Envoy.NodePorts != nil {
+		if err := nodePorts(contour); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // containerPorts validates container ports of contour, returning an
@@ -61,6 +71,35 @@ func containerPorts(contour *operatorv1alpha1.Contour) error {
 		return nil
 	}
 	return fmt.Errorf("http and https container ports are unspecified")
+}
+
+// nodePorts validates nodeports of contour, if specified, returning an
+// error if the nodeports do not meet the API specification.
+func nodePorts(contour *operatorv1alpha1.Contour) error {
+	var numsFound []int32
+	var namesFound []string
+	httpFound := false
+	httpsFound := false
+	for _, port := range contour.Spec.NetworkPublishing.Envoy.NodePorts {
+		if len(numsFound) > 0 && slice.ContainsInt32(numsFound, port.PortNumber) {
+			return fmt.Errorf("duplicate nodeport number %q", port.PortNumber)
+		}
+		numsFound = append(numsFound, port.PortNumber)
+		if len(namesFound) > 0 && slice.ContainsString(namesFound, port.Name) {
+			return fmt.Errorf("duplicate nodeport name %q", port.Name)
+		}
+		namesFound = append(namesFound, port.Name)
+		switch {
+		case port.Name == "http":
+			httpFound = true
+		case port.Name == "https":
+			httpsFound = true
+		}
+	}
+	if httpFound && httpsFound {
+		return nil
+	}
+	return fmt.Errorf("http and https nodeports are unspecified")
 }
 
 // GatewayClass returns true if gc is a valid GatewayClass.
