@@ -20,18 +20,16 @@ import (
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Config is the configuration of a Contour.
 type Config struct {
-	Name         string
-	Namespace    string
-	SpecNs       string
-	RemoveNs     bool
-	NetworkType  operatorv1alpha1.NetworkPublishingType
-	GatewayClass *string
+	Name        string
+	Namespace   string
+	SpecNs      string
+	RemoveNs    bool
+	NetworkType operatorv1alpha1.NetworkPublishingType
 }
 
 // New makes a Contour object using the provided ns/name for the object's
@@ -65,23 +63,7 @@ func New(cfg Config) *operatorv1alpha1.Contour {
 			},
 		},
 	}
-	if cfg.GatewayClass != nil {
-		cntr.Spec.GatewayClassRef = cfg.GatewayClass
-	}
 	return cntr
-}
-
-// CurrentContour returns the current Contour for the provided ns/name.
-func CurrentContour(ctx context.Context, cli client.Client, ns, name string) (*operatorv1alpha1.Contour, error) {
-	cntr := &operatorv1alpha1.Contour{}
-	key := types.NamespacedName{
-		Namespace: ns,
-		Name:      name,
-	}
-	if err := cli.Get(ctx, key, cntr); err != nil {
-		return nil, err
-	}
-	return cntr, nil
 }
 
 // OtherContoursExist lists Contour objects in all namespaces, returning the list
@@ -127,26 +109,6 @@ func OwningSelector(contour *operatorv1alpha1.Contour) *metav1.LabelSelector {
 			operatorv1alpha1.OwningContourNsLabel:   contour.Namespace,
 		},
 	}
-}
-
-// GatewayClassRefsExist returns a list of Contours that reference a GatewayClass
-// named name.
-func GatewayClassRefsExist(ctx context.Context, cli client.Client, name string) ([]operatorv1alpha1.Contour, error) {
-	var found []operatorv1alpha1.Contour
-	contours := &operatorv1alpha1.ContourList{}
-	if err := cli.List(ctx, contours); err != nil {
-		return found, err
-	}
-	if len(contours.Items) > 0 {
-		for i, c := range contours.Items {
-			if c.Spec.GatewayClassRef != nil {
-				if *c.Spec.GatewayClassRef == name {
-					found = append(found, contours.Items[i])
-				}
-			}
-		}
-	}
-	return found, nil
 }
 
 // OwnerLabels returns owner labels for the provided contour.

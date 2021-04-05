@@ -23,7 +23,6 @@ import (
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
 	objds "github.com/projectcontour/contour-operator/internal/objects/daemonset"
 	objdeploy "github.com/projectcontour/contour-operator/internal/objects/deployment"
-	objgc "github.com/projectcontour/contour-operator/internal/objects/gatewayclass"
 	objjob "github.com/projectcontour/contour-operator/internal/objects/job"
 	objns "github.com/projectcontour/contour-operator/internal/objects/namespace"
 	objsvc "github.com/projectcontour/contour-operator/internal/objects/service"
@@ -120,31 +119,6 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	contour := &operatorv1alpha1.Contour{}
 	if err := r.client.Get(ctx, req.NamespacedName, contour); err != nil {
 		if errors.IsNotFound(err) {
-			// Sync gatewayclass status if this contour is referenced by any gatewayclasses.
-			gc, exists, err := objgc.ParameterRefExists(ctx, r.client, req.Name, req.Namespace)
-			if err != nil {
-				return ctrl.Result{}, fmt.Errorf("failed to verify the existence of gatewayclasses for contour %s/%s: %w",
-					req.Namespace, req.Name, err)
-			}
-			if exists {
-				var errs []error
-				owned := objgc.IsController(gc)
-				valid := false
-				if owned {
-					if err := validation.GatewayClass(gc); err != nil {
-						errs = append(errs, fmt.Errorf("invalid gatewayclass %s: %w", gc.Name, err))
-					} else {
-						valid = true
-					}
-				}
-				if err := status.SyncGatewayClass(ctx, r.client, gc, owned, valid); err != nil {
-					errs = append(errs, fmt.Errorf("failed to sync status for contour %s/%s: %w", req.Namespace,
-						req.Name, err))
-				}
-				if len(errs) != 0 {
-					return ctrl.Result{}, retryable.NewMaybeRetryableAggregate(errs)
-				}
-			}
 			// This means the contour was already deleted/finalized and there are
 			// stale queue entries (or something edge triggering from a related
 			// resource that got deleted async).
@@ -160,9 +134,16 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		if err := validation.Contour(ctx, r.client, contour); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to validate contour %s/%s: %w", contour.Namespace, contour.Name, err)
 		}
-		switch {
-		case contour.GatewayClassSet():
-			if err := r.ensureContourForGatewayClass(ctx, contour); err != nil {
+		if !contour.IsFinalized() {
+			// Before doing anything with the contour, ensure it has a finalizer
+			// so it can cleaned-up later.
+			if err := objcontour.EnsureFinalizer(ctx, r.client, contour); err != nil {
+				return ctrl.Result{}, err
+			}
+			r.log.Info("finalized contour", "namespace", contour.Namespace, "name", contour.Name)
+		} else {
+			r.log.Info("contour finalized", "namespace", contour.Namespace, "name", contour.Name)
+			if err := r.ensureContour(ctx, contour); err != nil {
 				switch e := err.(type) {
 				case retryable.Error:
 					r.log.Error(e, "got retryable error; requeueing", "after", e.After())
@@ -171,45 +152,19 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 					return ctrl.Result{}, err
 				}
 			}
-		default:
-			if !contour.IsFinalized() {
-				// Before doing anything with the contour, ensure it has a finalizer
-				// so it can cleaned-up later.
-				if err := objcontour.EnsureFinalizer(ctx, r.client, contour); err != nil {
-					return ctrl.Result{}, err
-				}
-				r.log.Info("finalized contour", "namespace", contour.Namespace, "name", contour.Name)
-			} else {
-				r.log.Info("contour finalized", "namespace", contour.Namespace, "name", contour.Name)
-				if err := r.ensureContour(ctx, contour); err != nil {
-					switch e := err.(type) {
-					case retryable.Error:
-						r.log.Error(e, "got retryable error; requeueing", "after", e.After())
-						return ctrl.Result{RequeueAfter: e.After()}, nil
-					default:
-						return ctrl.Result{}, err
-					}
-				}
-				r.log.Info("ensured contour", "namespace", contour.Namespace, "name", contour.Name)
-			}
+			r.log.Info("ensured contour", "namespace", contour.Namespace, "name", contour.Name)
 		}
 	} else {
-		switch {
-		case contour.GatewayClassSet():
-			// Do nothing since the contour is a dependent resource of the associated gatewayclass.
-			return ctrl.Result{}, nil
-		default:
-			if err := r.ensureContourDeleted(ctx, contour); err != nil {
-				switch e := err.(type) {
-				case retryable.Error:
-					r.log.Error(e, "got retryable error; requeueing", "after", e.After())
-					return ctrl.Result{RequeueAfter: e.After()}, nil
-				default:
-					return ctrl.Result{}, err
-				}
+		if err := r.ensureContourDeleted(ctx, contour); err != nil {
+			switch e := err.(type) {
+			case retryable.Error:
+				r.log.Error(e, "got retryable error; requeueing", "after", e.After())
+				return ctrl.Result{RequeueAfter: e.After()}, nil
+			default:
+				return ctrl.Result{}, err
 			}
-			r.log.Info("deleted contour", "namespace", contour.Namespace, "name", contour.Name)
 		}
+		r.log.Info("deleted contour", "namespace", contour.Namespace, "name", contour.Name)
 	}
 	return ctrl.Result{}, nil
 }
@@ -277,91 +232,61 @@ func (r *reconciler) ensureContour(ctx context.Context, contour *operatorv1alpha
 	return retryable.NewMaybeRetryableAggregate(errs)
 }
 
-// ensureContourForGatewayClass ensures all necessary resources exist for the given contour
-// when the contour is being managed by a GatewayClass.
-func (r *reconciler) ensureContourForGatewayClass(ctx context.Context, contour *operatorv1alpha1.Contour) error {
-	if !contour.GatewayClassSet() {
-		return fmt.Errorf("gatewayclass not set for contour %s/%s", contour.Namespace, contour.Name)
-	}
-	var errs []error
-	cli := r.client
-	gcRef := *contour.Spec.GatewayClassRef
-	gc, err := objgc.Get(ctx, cli, gcRef)
-	if err != nil {
-		errs = append(errs, fmt.Errorf("failed to verify the existence of gatewayclass %s: %w", gcRef, err))
-	} else {
-		owned := objgc.IsController(gc)
-		if owned {
-			if err := validation.GatewayClass(gc); err != nil {
-				errs = append(errs, fmt.Errorf("invalid gatewayclass %s: %w", gc.Name, err))
-			}
-		}
-	}
-	if err := status.SyncContour(ctx, cli, contour); err != nil {
-		errs = append(errs, fmt.Errorf("failed to sync status for contour %s/%s: %w", contour.Namespace, contour.Name, err))
-	} else {
-		r.log.Info("synced status for contour", "namespace", contour.Namespace, "name", contour.Name)
-	}
-	return retryable.NewMaybeRetryableAggregate(errs)
-}
-
 // ensureContourDeleted ensures contour and all child resources have been deleted.
 func (r *reconciler) ensureContourDeleted(ctx context.Context, contour *operatorv1alpha1.Contour) error {
 	var errs []error
 	cli := r.client
-	if !contour.GatewayClassSet() {
-		if contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.LoadBalancerServicePublishingType ||
-			contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.NodePortServicePublishingType {
-			if err := objsvc.EnsureEnvoyServiceDeleted(ctx, cli, contour); err != nil {
-				errs = append(errs, fmt.Errorf("failed to delete envoy service for contour %s/%s: %w", contour.Namespace, contour.Name, err))
-			} else {
-				r.log.Info("deleted envoy service for contour", "namespace", contour.Namespace, "name", contour.Name)
-			}
-		}
-		if err := objsvc.EnsureContourServiceDeleted(ctx, cli, contour); err != nil {
-			errs = append(errs, fmt.Errorf("failed to delete service for contour %s/%s: %w", contour.Namespace, contour.Name, err))
+	if contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.LoadBalancerServicePublishingType ||
+		contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.NodePortServicePublishingType {
+		if err := objsvc.EnsureEnvoyServiceDeleted(ctx, cli, contour); err != nil {
+			errs = append(errs, fmt.Errorf("failed to delete envoy service for contour %s/%s: %w", contour.Namespace, contour.Name, err))
 		} else {
-			r.log.Info("deleted contour service for contour", "namespace", contour.Namespace, "name", contour.Name)
+			r.log.Info("deleted envoy service for contour", "namespace", contour.Namespace, "name", contour.Name)
 		}
-		if err := objds.EnsureDaemonSetDeleted(ctx, cli, contour); err != nil {
-			errs = append(errs, fmt.Errorf("failed to delete daemonset from contour %s/%s: %w", contour.Namespace, contour.Name, err))
+	}
+	if err := objsvc.EnsureContourServiceDeleted(ctx, cli, contour); err != nil {
+		errs = append(errs, fmt.Errorf("failed to delete service for contour %s/%s: %w", contour.Namespace, contour.Name, err))
+	} else {
+		r.log.Info("deleted contour service for contour", "namespace", contour.Namespace, "name", contour.Name)
+	}
+	if err := objds.EnsureDaemonSetDeleted(ctx, cli, contour); err != nil {
+		errs = append(errs, fmt.Errorf("failed to delete daemonset from contour %s/%s: %w", contour.Namespace, contour.Name, err))
+	} else {
+		r.log.Info("deleted daemonset for contour", "namespace", contour.Namespace, "name", contour.Name)
+	}
+	if err := objdeploy.EnsureDeploymentDeleted(ctx, cli, contour); err != nil {
+		errs = append(errs, fmt.Errorf("failed to delete deployment from contour %s/%s: %w", contour.Namespace, contour.Name, err))
+	} else {
+		r.log.Info("deleted deployment for contour", "namespace", contour.Namespace, "name", contour.Name)
+	}
+	if err := objjob.EnsureJobDeleted(ctx, cli, contour); err != nil {
+		errs = append(errs, fmt.Errorf("failed to delete job from contour %s/%s: %w", contour.Namespace, contour.Name, err))
+	} else {
+		r.log.Info("deleted job for contour", "namespace", contour.Namespace, "name", contour.Name)
+	}
+	cmCfg := objcm.NewCfgForContour(contour)
+	if err := objcm.Delete(ctx, cli, cmCfg); err != nil {
+		errs = append(errs, fmt.Errorf("failed to delete configmap for contour %s/%s: %w",
+			contour.Namespace, contour.Name, err))
+	} else {
+		r.log.Info("deleted configmap for contour", "namespace", contour.Namespace, "name", contour.Name)
+	}
+	if err := objutil.EnsureRBACDeleted(ctx, cli, contour); err != nil {
+		errs = append(errs, fmt.Errorf("failed to delete rbac for contour %s/%s: %w", contour.Namespace, contour.Name, err))
+	} else {
+		r.log.Info("deleted rbac for contour", "namespace", contour.Namespace, "name", contour.Name)
+	}
+	if err := objns.EnsureNamespaceDeleted(ctx, cli, contour); err != nil {
+		errs = append(errs, fmt.Errorf("failed to delete namespace %s for contour %s/%s: %w",
+			contour.Spec.Namespace.Name, contour.Namespace, contour.Name, err))
+	} else {
+		r.log.Info("deleted namespace for contour", "namespace", contour.Namespace, "name", contour.Name)
+	}
+	if len(errs) == 0 {
+		if err := objcontour.EnsureFinalizerRemoved(ctx, cli, contour); err != nil {
+			errs = append(errs, fmt.Errorf("failed to remove finalizer from contour %s/%s: %w", contour.Namespace, contour.Name, err))
 		} else {
-			r.log.Info("deleted daemonset for contour", "namespace", contour.Namespace, "name", contour.Name)
-		}
-		if err := objdeploy.EnsureDeploymentDeleted(ctx, cli, contour); err != nil {
-			errs = append(errs, fmt.Errorf("failed to delete deployment from contour %s/%s: %w", contour.Namespace, contour.Name, err))
-		} else {
-			r.log.Info("deleted deployment for contour", "namespace", contour.Namespace, "name", contour.Name)
-		}
-		if err := objjob.EnsureJobDeleted(ctx, cli, contour); err != nil {
-			errs = append(errs, fmt.Errorf("failed to delete job from contour %s/%s: %w", contour.Namespace, contour.Name, err))
-		} else {
-			r.log.Info("deleted job for contour", "namespace", contour.Namespace, "name", contour.Name)
-		}
-		cmCfg := objcm.NewCfgForContour(contour)
-		if err := objcm.Delete(ctx, cli, cmCfg); err != nil {
-			errs = append(errs, fmt.Errorf("failed to delete configmap for contour %s/%s: %w",
-				contour.Namespace, contour.Name, err))
-		} else {
-			r.log.Info("deleted configmap for contour", "namespace", contour.Namespace, "name", contour.Name)
-		}
-		if err := objutil.EnsureRBACDeleted(ctx, cli, contour); err != nil {
-			errs = append(errs, fmt.Errorf("failed to delete rbac for contour %s/%s: %w", contour.Namespace, contour.Name, err))
-		} else {
-			r.log.Info("deleted rbac for contour", "namespace", contour.Namespace, "name", contour.Name)
-		}
-		if err := objns.EnsureNamespaceDeleted(ctx, cli, contour); err != nil {
-			errs = append(errs, fmt.Errorf("failed to delete namespace %s for contour %s/%s: %w",
-				contour.Spec.Namespace.Name, contour.Namespace, contour.Name, err))
-		} else {
-			r.log.Info("deleted namespace for contour", "namespace", contour.Namespace, "name", contour.Name)
-		}
-		if len(errs) == 0 {
-			if err := objcontour.EnsureFinalizerRemoved(ctx, cli, contour); err != nil {
-				errs = append(errs, fmt.Errorf("failed to remove finalizer from contour %s/%s: %w", contour.Namespace, contour.Name, err))
-			} else {
-				r.log.Info("removed finalizer from contour", "namespace", contour.Namespace, "name", contour.Name)
-			}
+			r.log.Info("removed finalizer from contour", "namespace", contour.Namespace, "name", contour.Name)
 		}
 	}
 	return utilerrors.NewAggregate(errs)

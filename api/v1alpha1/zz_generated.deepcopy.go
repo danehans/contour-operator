@@ -101,11 +101,6 @@ func (in *ContourSpec) DeepCopyInto(out *ContourSpec) {
 	*out = *in
 	out.Namespace = in.Namespace
 	in.NetworkPublishing.DeepCopyInto(&out.NetworkPublishing)
-	if in.GatewayClassRef != nil {
-		in, out := &in.GatewayClassRef, &out.GatewayClassRef
-		*out = new(string)
-		**out = **in
-	}
 	if in.IngressClassName != nil {
 		in, out := &in.IngressClassName, &out.IngressClassName
 		*out = new(string)

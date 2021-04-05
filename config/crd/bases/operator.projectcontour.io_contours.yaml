@@ -39,10 +39,6 @@ spec:
           spec:
             description: Spec defines the desired state of Contour.
             properties:
-              gatewayClassRef:
-                description: GatewayClassRef is a reference to a GatewayClass name used for managing a Contour.
-                maxLength: 253
-                type: string
               ingressClassName:
                 description: "IngressClassName is the name of the IngressClass used by Contour. If unset, Contour will process all ingress objects without an ingress class annotation or ingress objects with an annotation matching ingress-class=contour. When specified, Contour will only process ingress objects that match the provided class. \n For additional IngressClass details, refer to:   https://projectcontour.io/docs/main/config/annotations/#ingress-class"
                 maxLength: 253
@@ -52,7 +48,7 @@ spec:
                 default:
                   name: projectcontour
                   removeOnDeletion: false
-                description: "Namespace defines the schema of a Contour namespace. See each field for additional details. Namespace name should be the same namespace as the Gateway when GatewayClassRef is set. \n TODO [danehans]: Ignore Namespace when GatewayClassRef is set. xref: https://github.com/projectcontour/contour-operator/issues/212"
+                description: Namespace defines the schema of a Contour namespace. See each field for additional details.
                 properties:
                   name:
                     default: projectcontour

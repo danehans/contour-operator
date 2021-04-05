@@ -17,21 +17,14 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/go-logr/logr"
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	operatorconfig "github.com/projectcontour/contour-operator/internal/operator/config"
 	contourcontroller "github.com/projectcontour/contour-operator/internal/operator/controller/contour"
-	gwcontroller "github.com/projectcontour/contour-operator/internal/operator/controller/gateway"
-	gccontroller "github.com/projectcontour/contour-operator/internal/operator/controller/gatewayclass"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-
-	"github.com/go-logr/logr"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
 
 const (
@@ -70,8 +63,7 @@ type Operator struct {
 
 // New creates a new operator from cliCfg and opCfg.
 func New(cliCfg *rest.Config, opCfg *operatorconfig.Config) (*Operator, error) {
-	nonCached := []client.Object{&operatorv1alpha1.Contour{}, &gatewayv1alpha1.GatewayClass{},
-		&gatewayv1alpha1.Gateway{}, &apiextensionsv1.CustomResourceDefinition{}}
+	nonCached := []client.Object{&operatorv1alpha1.Contour{}}
 	mgrOpts := manager.Options{
 		Scheme:                GetOperatorScheme(),
 		LeaderElection:        opCfg.LeaderElection,
@@ -102,10 +94,6 @@ func New(cliCfg *rest.Config, opCfg *operatorconfig.Config) (*Operator, error) {
 // Start creates Gateway API controllers (if configured) and starts the operator
 // synchronously until a message is received from ctx.
 func (o *Operator) Start(ctx context.Context, opCfg *operatorconfig.Config) error {
-	if err := o.createGatewayControllers(ctx, opCfg); err != nil {
-		return fmt.Errorf("failed to create gateway controllers: %w", err)
-	}
-
 	errChan := make(chan error)
 	go func() {
 		errChan <- o.manager.Start(ctx)
@@ -118,68 +106,4 @@ func (o *Operator) Start(ctx context.Context, opCfg *operatorconfig.Config) erro
 	case err := <-errChan:
 		return err
 	}
-}
-
-// createGatewayControllers creates Gateway and GatewayClass controllers.
-func (o *Operator) createGatewayControllers(ctx context.Context, opCfg *operatorconfig.Config) error {
-	if !o.gatewayCRDsExist(ctx) {
-		o.log.Info("Gateway CRDs not found; starting operator without gateway controllers")
-	} else {
-		// Create and register the gatewayclass controller with the operator manager.
-		if _, err := gccontroller.New(o.manager); err != nil {
-			return fmt.Errorf("failed to create gatewayclass controller: %w", err)
-		}
-		// Create and register the gateway controller with the operator manager.
-		cfg := gwcontroller.Config{
-			ContourImage: opCfg.ContourImage,
-			EnvoyImage:   opCfg.EnvoyImage,
-		}
-		if _, err := gwcontroller.New(o.manager, cfg); err != nil {
-			return fmt.Errorf("failed to create gateway controller: %w", err)
-		}
-	}
-	return nil
-}
-
-// gatewayCRDsExist returns nil if Gateway CRDs exist.
-func (o *Operator) gatewayCRDsExist(ctx context.Context) bool {
-	gc := &apiextensionsv1.CustomResourceDefinition{
-		TypeMeta: metav1.TypeMeta{},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "gatewayclasses.networking.x-k8s.io",
-		},
-	}
-	gw := &apiextensionsv1.CustomResourceDefinition{
-		TypeMeta: metav1.TypeMeta{},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "gateways.networking.x-k8s.io",
-		},
-	}
-	httproute := &apiextensionsv1.CustomResourceDefinition{
-		TypeMeta: metav1.TypeMeta{},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "httproutes.networking.x-k8s.io",
-		},
-	}
-	tlsroute := &apiextensionsv1.CustomResourceDefinition{
-		TypeMeta: metav1.TypeMeta{},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "tlsroutes.networking.x-k8s.io",
-		},
-	}
-	bp := &apiextensionsv1.CustomResourceDefinition{
-		TypeMeta: metav1.TypeMeta{},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "backendpolicies.networking.x-k8s.io",
-		},
-	}
-	// The list omits TCP and UDP routes since they're unsupported by Contour.
-	crds := []*apiextensionsv1.CustomResourceDefinition{gc, gw, httproute, tlsroute, bp}
-	for i, crd := range crds {
-		key := types.NamespacedName{Name: crd.Name}
-		if err := o.client.Get(ctx, key, crds[i]); err != nil {
-			return false
-		}
-	}
-	return true
 }

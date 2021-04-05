@@ -21,7 +21,6 @@ import (
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
-	objgw "github.com/projectcontour/contour-operator/internal/objects/gateway"
 	"github.com/projectcontour/contour-operator/pkg/labels"
 
 	corev1 "k8s.io/api/core/v1"
@@ -30,7 +29,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
 
 const (
@@ -177,17 +175,6 @@ func NewCfgForContour(contour *operatorv1alpha1.Contour) *Config {
 	cfg.Namespace = contour.Spec.Namespace.Name
 	labels := objcontour.OwnerLabels(contour)
 	cfg.Labels = labels
-	return cfg
-}
-
-// NewCfgForGateway returns a ConfigMap Config with default fields set for gw.
-func NewCfgForGateway(gw *gatewayv1alpha1.Gateway) *Config {
-	cfg := NewConfig()
-	cfg.Namespace = gw.Namespace
-	labels := objgw.OwnerLabels(gw)
-	cfg.Labels = labels
-	cfg.Contour.GatewayNamespace = gw.Namespace
-	cfg.Contour.GatewayName = gw.Name
 	return cfg
 }
 

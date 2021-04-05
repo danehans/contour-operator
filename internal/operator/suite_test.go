@@ -33,7 +33,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	gatewayv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -46,8 +45,6 @@ const (
 	testOperatorNs   = "test-contour-operator"
 	defaultNamespace = "projectcontour"
 	defaultReplicas  = int32(2)
-
-	testGatewayClassName = "test-contour"
 
 	timeout  = time.Second * 10
 	interval = time.Millisecond * 250
@@ -64,24 +61,6 @@ var (
 	}
 
 	testIngressClass = "test-ic"
-
-	gc = &gatewayv1alpha1.GatewayClass{
-		TypeMeta: metav1.TypeMeta{},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      testGatewayClassName,
-			Namespace: testOperatorNs,
-		},
-		Spec: gatewayv1alpha1.GatewayClassSpec{
-			Controller: operatorv1alpha1.GatewayClassControllerRef,
-			ParametersRef: &gatewayv1alpha1.ParametersReference{
-				Group:     operatorv1alpha1.GatewayClassParamsRefGroup,
-				Kind:      operatorv1alpha1.GatewayClassParamsRefKind,
-				Scope:     "Namespace",
-				Namespace: testOperatorNs,
-				Name:      testContourName,
-			},
-		},
-	}
 
 	ctx       = context.Background()
 	finalizer = operatorv1alpha1.ContourFinalizer
@@ -103,9 +82,8 @@ var _ = BeforeSuite(func(done Done) {
 	By("Bootstrapping the test environment")
 	opCRD := filepath.Join("..", "..", "config", "crd", "bases")
 	contourCRDs := filepath.Join("..", "..", "config", "crd", "contour")
-	gatewayCRDs := filepath.Join("..", "..", "config", "crd", "gateway")
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths: []string{opCRD, contourCRDs, gatewayCRDs},
+		CRDDirectoryPaths: []string{opCRD, contourCRDs},
 	}
 
 	cliCfg, err := testEnv.Start()
@@ -190,12 +168,7 @@ var _ = Describe("Run controller", func() {
 			updated.Spec.Replicas = updatedReplicas
 			updated.Spec.Namespace.Name = updatedNs
 			updated.Spec.Namespace.RemoveOnDeletion = updatedRemoveNs
-			updated.Spec.GatewayClassRef = &gc.Name
 			Expect(operator.client.Update(ctx, updated)).Should(Succeed())
-
-			// Create the GatewayClass referenced by the test Contour.
-			By("By creating a gatewayclass")
-			Expect(operator.client.Create(ctx, gc)).Should(Succeed())
 
 			By("Expecting replicas to be updated")
 			Eventually(func() int32 {
@@ -224,21 +197,6 @@ var _ = Describe("Run controller", func() {
 				Expect(operator.client.Get(ctx, key, f)).Should(Succeed())
 				return *f.Spec.IngressClassName
 			}, timeout, interval).Should(Equal(testIngressClass))
-
-			By("Expecting gatewayClassRef to be updated")
-			Eventually(func() string {
-				f := &operatorv1alpha1.Contour{}
-				Expect(operator.client.Get(ctx, key, f)).Should(Succeed())
-				return *f.Spec.GatewayClassRef
-			}, timeout, interval).Should(Equal(gc.Name))
-
-			// Remove the GatewayClass reference
-			updated.Spec.GatewayClassRef = nil
-			Expect(operator.client.Update(ctx, updated)).Should(Succeed())
-
-			// Delete the GatewayClass referenced by the test Contour.
-			By("By deleting a gatewayclass")
-			Expect(operator.client.Delete(ctx, gc)).Should(Succeed())
 
 			By("Expecting to delete contour successfully")
 			Eventually(func() error {

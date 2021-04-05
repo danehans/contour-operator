@@ -45,13 +45,6 @@ kubectl::apply -f https://projectcontour.io/examples/kuard.yaml
 waitForHttpResponse http://local.projectcontour.io 1 100
 kubectl::delete -f https://projectcontour.io/examples/kuard.yaml
 kubectl::delete -f examples/contour/contour-nodeport.yaml
-# Test Gateway
-kubectl::apply -f examples/gateway/gateway-nodeport.yaml
-kubectl::apply -f examples/gateway/kuard/kuard.yaml
-waitForHttpResponse http://local.projectcontour.io 1 100
-kubectl::delete -f examples/gateway/kuard/kuard.yaml
-kubectl::delete -f examples/gateway/gateway-nodeport.yaml
-kubectl::delete -f examples/operator/operator.yaml
 
 if ${RESP} == false ; then
   echo "examples test passed"
