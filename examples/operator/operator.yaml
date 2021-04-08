@@ -341,6 +341,398 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.4.1
   creationTimestamp: null
+  name: envoys.projectcontour.io
+spec:
+  group: projectcontour.io
+  names:
+    kind: Envoy
+    listKind: EnvoyList
+    plural: envoys
+    singular: envoy
+  preserveUnknownFields: false
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=="Available")].status
+      name: Ready
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Available")].reason
+      name: Reason
+      type: string
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: Envoy is the Schema for the envoys API.
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: Spec defines the desired state of Envoy.
+            properties:
+              networkPublishing:
+                default:
+                  containerPorts:
+                  - name: http
+                    portNumber: 8080
+                  - name: https
+                    portNumber: 8443
+                  type: LoadBalancerService
+                description: "NetworkPublishing defines the schema for publishing
+                  Envoy to a network. \n See each field for additional details."
+                properties:
+                  containerPorts:
+                    default:
+                    - name: http
+                      portNumber: 8080
+                    - name: https
+                      portNumber: 8443
+                    description: "ContainerPorts is a list of container ports to expose
+                      from the Envoy container(s). Exposing a port here gives the
+                      system additional information about the network connections
+                      the Envoy container uses, but is primarily informational. Not
+                      specifying a port here DOES NOT prevent that port from being
+                      exposed by Envoy. Any port which is listening on the default
+                      \"0.0.0.0\" address inside the Envoy container will be accessible
+                      from the network. Names and port numbers must be unique in the
+                      list container ports. Two ports must be specified, one named
+                      \"http\" for Envoy's insecure service and one named \"https\"
+                      for Envoy's secure service. \n TODO [danehans]: Update minItems
+                      to 1, requiring only https when the following issue is fixed:
+                      https://github.com/projectcontour/contour/issues/2577. \n TODO
+                      [danehans]: Increase maxItems when https://github.com/projectcontour/contour/pull/3263
+                      is implemented."
+                    items:
+                      description: ContainerPort is the schema to specify a network
+                        port for a container. A container port gives the system additional
+                        information about network connections a container uses, but
+                        is primarily informational.
+                      properties:
+                        name:
+                          description: Name is an IANA_SVC_NAME within the pod.
+                          maxLength: 253
+                          minLength: 1
+                          type: string
+                        portNumber:
+                          description: PortNumber is the network port number to expose
+                            on the envoy pod. The number must be greater than 0 and
+                            less than 65536.
+                          format: int32
+                          maximum: 65535
+                          minimum: 1
+                          type: integer
+                      required:
+                      - name
+                      - portNumber
+                      type: object
+                    maxItems: 2
+                    minItems: 2
+                    type: array
+                  loadBalancer:
+                    default:
+                      providerParameters:
+                        type: AWS
+                      scope: External
+                    description: "loadBalancer holds parameters for the load balancer.
+                      Present only if type is LoadBalancerService. \n If unspecified,
+                      defaults to an external Classic AWS ELB."
+                    properties:
+                      providerParameters:
+                        default:
+                          type: AWS
+                        description: providerParameters contains load balancer information
+                          specific to the underlying infrastructure provider.
+                        properties:
+                          type:
+                            default: AWS
+                            description: type is the underlying infrastructure provider
+                              for the load balancer. Allowed values are "AWS", "Azure",
+                              and "GCP".
+                            enum:
+                            - AWS
+                            - Azure
+                            - GCP
+                            type: string
+                        type: object
+                      scope:
+                        default: External
+                        description: Scope indicates the scope at which the load balancer
+                          is exposed. Possible values are "External" and "Internal".
+                        enum:
+                        - Internal
+                        - External
+                        type: string
+                    type: object
+                  type:
+                    default: LoadBalancerService
+                    description: "Type is the type of publishing strategy to use.
+                      Valid values are: \n * LoadBalancerService \n In this configuration,
+                      network endpoints for Envoy use container networking. A Kubernetes
+                      LoadBalancer Service is created to publish Envoy network endpoints.
+                      The Service uses port 80 to publish Envoy's HTTP network endpoint
+                      and port 443 to publish Envoy's HTTPS network endpoint. \n See:
+                      https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer
+                      \n * NodePortService \n Publishes Envoy network endpoints using
+                      a Kubernetes NodePort Service. \n In this configuration, Envoy
+                      network endpoints use container networking. A Kubernetes NodePort
+                      Service is created to publish the network endpoints. \n See:
+                      https://kubernetes.io/docs/concepts/services-networking/service/#nodeport
+                      \n * ClusterIPService \n Publishes Envoy network endpoints using
+                      a Kubernetes ClusterIP Service. \n In this configuration, Envoy
+                      network endpoints use container networking. A Kubernetes ClusterIP
+                      Service is created to publish the network endpoints. \n See:
+                      https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types"
+                    enum:
+                    - LoadBalancerService
+                    - NodePortService
+                    - ClusterIPService
+                    type: string
+                type: object
+            type: object
+          status:
+            description: Status defines the observed state of Envoy.
+            properties:
+              availableEnvoys:
+                description: AvailableEnvoys is the number of observed available Envoy
+                  pods.
+                format: int32
+                type: integer
+              conditions:
+                description: Conditions represent the observations of an Envoy's current
+                  state. Known condition types are "Available". Reference the condition
+                  type for additional details.
+                items:
+                  description: "DetailedCondition is an extension of the normal Kubernetes
+                    conditions, with two extra fields to hold sub-conditions, which
+                    provide more detailed reasons for the state (True or False) of
+                    the condition. \n `errors` holds information about sub-conditions
+                    which are fatal to that condition and render its state False.
+                    \n `warnings` holds information about sub-conditions which are
+                    not fatal to that condition and do not force the state to be False.
+                    \n Remember that Conditions have a type, a status, and a reason.
+                    \n The type is the type of the condition, the most important one
+                    in this CRD set is `Valid`. `Valid` is a positive-polarity condition:
+                    when it is `status: true` there are no problems. \n In more detail,
+                    `status: true` means that the object is has been ingested into
+                    Contour with no errors. `warnings` may still be present, and will
+                    be indicated in the Reason field. There must be zero entries in
+                    the `errors` slice in this case. \n `Valid`, `status: false` means
+                    that the object has had one or more fatal errors during processing
+                    into Contour.  The details of the errors will be present under
+                    the `errors` field. There must be at least one error in the `errors`
+                    slice if `status` is `false`. \n For DetailedConditions of types
+                    other than `Valid`, the Condition must be in the negative polarity.
+                    When they have `status` `true`, there is an error. There must
+                    be at least one entry in the `errors` Subcondition slice. When
+                    they have `status` `false`, there are no serious errors, and there
+                    must be zero entries in the `errors` slice. In either case, there
+                    may be entries in the `warnings` slice. \n Regardless of the polarity,
+                    the `reason` and `message` fields must be updated with either
+                    the detail of the reason (if there is one and only one entry in
+                    total across both the `errors` and `warnings` slices), or `MultipleReasons`
+                    if there is more than one entry."
+                  properties:
+                    errors:
+                      description: "Errors contains a slice of relevant error subconditions
+                        for this object. \n Subconditions are expected to appear when
+                        relevant (when there is a error), and disappear when not relevant.
+                        An empty slice here indicates no errors."
+                      items:
+                        description: "SubCondition is a Condition-like type intended
+                          for use as a subcondition inside a DetailedCondition. \n
+                          It contains a subset of the Condition fields. \n It is intended
+                          for warnings and errors, so `type` names should use abnormal-true
+                          polarity, that is, they should be of the form \"ErrorPresent:
+                          true\". \n The expected lifecycle for these errors is that
+                          they should only be present when the error or warning is,
+                          and should be removed when they are not relevant."
+                        properties:
+                          message:
+                            description: "Message is a human readable message indicating
+                              details about the transition. \n This may be an empty
+                              string."
+                            maxLength: 32768
+                            type: string
+                          reason:
+                            description: "Reason contains a programmatic identifier
+                              indicating the reason for the condition's last transition.
+                              Producers of specific condition types may define expected
+                              values and meanings for this field, and whether the
+                              values are considered a guaranteed API. \n The value
+                              should be a CamelCase string. \n This field may not
+                              be empty."
+                            maxLength: 1024
+                            minLength: 1
+                            pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                            type: string
+                          status:
+                            description: Status of the condition, one of True, False,
+                              Unknown.
+                            enum:
+                            - "True"
+                            - "False"
+                            - Unknown
+                            type: string
+                          type:
+                            description: "Type of condition in `CamelCase` or in `foo.example.com/CamelCase`.
+                              \n This must be in abnormal-true polarity, that is,
+                              `ErrorFound` or `controller.io/ErrorFound`. \n The regex
+                              it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)"
+                            maxLength: 316
+                            pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                            type: string
+                        required:
+                        - message
+                        - reason
+                        - status
+                        - type
+                        type: object
+                      type: array
+                    lastTransitionTime:
+                      description: lastTransitionTime is the last time the condition
+                        transitioned from one status to another. This should be when
+                        the underlying condition changed.  If that is not known, then
+                        using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: message is a human readable message indicating
+                        details about the transition. This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: observedGeneration represents the .metadata.generation
+                        that the condition was set based upon. For instance, if .metadata.generation
+                        is currently 12, but the .status.conditions[x].observedGeneration
+                        is 9, the condition is out of date with respect to the current
+                        state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: reason contains a programmatic identifier indicating
+                        the reason for the condition's last transition. Producers
+                        of specific condition types may define expected values and
+                        meanings for this field, and whether the values are considered
+                        a guaranteed API. The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                        --- Many .condition.type values are consistent across resources
+                        like Available, but because arbitrary conditions can be useful
+                        (see .node.status.conditions), the ability to deconflict is
+                        important. The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                    warnings:
+                      description: "Warnings contains a slice of relevant warning
+                        subconditions for this object. \n Subconditions are expected
+                        to appear when relevant (when there is a warning), and disappear
+                        when not relevant. An empty slice here indicates no warnings."
+                      items:
+                        description: "SubCondition is a Condition-like type intended
+                          for use as a subcondition inside a DetailedCondition. \n
+                          It contains a subset of the Condition fields. \n It is intended
+                          for warnings and errors, so `type` names should use abnormal-true
+                          polarity, that is, they should be of the form \"ErrorPresent:
+                          true\". \n The expected lifecycle for these errors is that
+                          they should only be present when the error or warning is,
+                          and should be removed when they are not relevant."
+                        properties:
+                          message:
+                            description: "Message is a human readable message indicating
+                              details about the transition. \n This may be an empty
+                              string."
+                            maxLength: 32768
+                            type: string
+                          reason:
+                            description: "Reason contains a programmatic identifier
+                              indicating the reason for the condition's last transition.
+                              Producers of specific condition types may define expected
+                              values and meanings for this field, and whether the
+                              values are considered a guaranteed API. \n The value
+                              should be a CamelCase string. \n This field may not
+                              be empty."
+                            maxLength: 1024
+                            minLength: 1
+                            pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                            type: string
+                          status:
+                            description: Status of the condition, one of True, False,
+                              Unknown.
+                            enum:
+                            - "True"
+                            - "False"
+                            - Unknown
+                            type: string
+                          type:
+                            description: "Type of condition in `CamelCase` or in `foo.example.com/CamelCase`.
+                              \n This must be in abnormal-true polarity, that is,
+                              `ErrorFound` or `controller.io/ErrorFound`. \n The regex
+                              it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)"
+                            maxLength: 316
+                            pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                            type: string
+                        required:
+                        - message
+                        - reason
+                        - status
+                        - type
+                        type: object
+                      type: array
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+            required:
+            - availableEnvoys
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.4.1
+  creationTimestamp: null
   name: extensionservices.projectcontour.io
 spec:
   group: projectcontour.io
@@ -2750,12 +3142,28 @@ rules:
 - apiGroups:
   - networking.x-k8s.io
   resources:
+  - backendpolicies
   - gatewayclasses
   - gateways
+  - httproutes
+  - tlsroutes
   verbs:
   - get
   - list
+  - update
   - watch
+- apiGroups:
+  - networking.x-k8s.io
+  resources:
+  - backendpolicies/status
+  - gatewayclasses/status
+  - gateways/status
+  - httproutes/status
+  - tlsroutes/status
+  verbs:
+  - create
+  - get
+  - update
 - apiGroups:
   - operator.projectcontour.io
   resources:
@@ -2923,8 +3331,8 @@ spec:
         - --enable-leader-election
         command:
         - /contour-operator
-        image: docker.io/projectcontour/contour-operator:fd7f2b37
-        imagePullPolicy: IfNotPresent
+        image: docker.io/projectcontour/contour-operator:main
+        imagePullPolicy: Always
         name: contour-operator
         resources:
           requests:

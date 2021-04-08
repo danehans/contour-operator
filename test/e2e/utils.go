@@ -24,8 +24,6 @@ import (
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
-	objsvc "github.com/projectcontour/contour-operator/internal/objects/service"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -415,8 +413,8 @@ func updateLbSvcIPAndNodePorts(ctx context.Context, cl client.Client, timeout ti
 		return fmt.Errorf("invalid type %s for service %s/%s", svc.Spec.Type, ns, name)
 	}
 	svc.Spec.LoadBalancerIP = "127.0.0.1"
-	svc.Spec.Ports[0].NodePort = objsvc.EnvoyNodePortHTTPPort
-	svc.Spec.Ports[1].NodePort = objsvc.EnvoyNodePortHTTPSPort
+	svc.Spec.Ports[0].NodePort = int32(30080)
+	svc.Spec.Ports[1].NodePort = int32(30443)
 	if err := cl.Update(ctx, svc); err != nil {
 		return err
 	}

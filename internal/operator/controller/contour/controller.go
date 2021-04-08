@@ -213,16 +213,6 @@ func (r *reconciler) ensureContour(ctx context.Context, contour *operatorv1alpha
 		} else {
 			r.log.Info("ensured contour service for contour", "namespace", contour.Namespace, "name", contour.Name)
 		}
-		if contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.LoadBalancerServicePublishingType ||
-			contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.NodePortServicePublishingType ||
-			contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.ClusterIPServicePublishingType {
-			if err := objsvc.EnsureEnvoyService(ctx, cli, contour); err != nil {
-				errs = append(errs, fmt.Errorf("failed to ensure envoy service for contour %s/%s: %w",
-					contour.Namespace, contour.Name, err))
-			} else {
-				r.log.Info("ensured envoy service for contour", "namespace", contour.Namespace, "name", contour.Name)
-			}
-		}
 	}
 	if err := status.SyncContour(ctx, cli, contour); err != nil {
 		errs = append(errs, fmt.Errorf("failed to sync status for contour %s/%s: %w", contour.Namespace, contour.Name, err))
@@ -236,14 +226,6 @@ func (r *reconciler) ensureContour(ctx context.Context, contour *operatorv1alpha
 func (r *reconciler) ensureContourDeleted(ctx context.Context, contour *operatorv1alpha1.Contour) error {
 	var errs []error
 	cli := r.client
-	if contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.LoadBalancerServicePublishingType ||
-		contour.Spec.NetworkPublishing.Envoy.Type == operatorv1alpha1.NodePortServicePublishingType {
-		if err := objsvc.EnsureEnvoyServiceDeleted(ctx, cli, contour); err != nil {
-			errs = append(errs, fmt.Errorf("failed to delete envoy service for contour %s/%s: %w", contour.Namespace, contour.Name, err))
-		} else {
-			r.log.Info("deleted envoy service for contour", "namespace", contour.Namespace, "name", contour.Name)
-		}
-	}
 	if err := objsvc.EnsureContourServiceDeleted(ctx, cli, contour); err != nil {
 		errs = append(errs, fmt.Errorf("failed to delete service for contour %s/%s: %w", contour.Namespace, contour.Name, err))
 	} else {
