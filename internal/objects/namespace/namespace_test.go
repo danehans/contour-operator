@@ -20,6 +20,7 @@ import (
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
 
+	contourv1alpha1 "github.com/projectcontour/contour/apis/projectcontour/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 )
@@ -51,7 +52,7 @@ func TestDesiredNamespace(t *testing.T) {
 		Namespace:   fmt.Sprintf("%s-ns", cntrName),
 		SpecNs:      "projectcontour",
 		RemoveNs:    false,
-		NetworkType: operatorv1alpha1.LoadBalancerServicePublishingType,
+		NetworkType: contourv1alpha1.LoadBalancerServicePublishingType,
 	}
 	cntr := objcontour.New(cfg)
 	ns := DesiredNamespace(cntr)

@@ -23,7 +23,9 @@ if ! [ "$(which curl)" ] ; then
 fi
 
 # Verify connectivity to the Contour CRD manifest URL.
-URL="https://raw.githubusercontent.com/projectcontour/contour/${VERSION}/examples/contour/01-crds.yaml"
+# TODO [danehans]: Revert when Envoy API is merged.
+#URL="https://raw.githubusercontent.com/projectcontour/contour/${VERSION}/examples/contour/01-crds.yaml"
+URL="https://raw.githubusercontent.com/danehans/contour/envoy_mgt_with_ctrl_runtime/examples/contour/01-crds.yaml"
 resp=$(curl -s -w %{http_code} -o /dev/null ${URL})
 if [ "$resp" = "200" ] ; then
   echo "Generating the Contour CRD YAML document..."

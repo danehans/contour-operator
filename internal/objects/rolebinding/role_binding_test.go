@@ -20,6 +20,7 @@ import (
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
 
+	contourv1alpha1 "github.com/projectcontour/contour/apis/projectcontour/v1alpha1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 )
@@ -71,7 +72,7 @@ func TestDesiredRoleBinding(t *testing.T) {
 		Namespace:   fmt.Sprintf("%s-ns", name),
 		SpecNs:      "projectcontour",
 		RemoveNs:    false,
-		NetworkType: operatorv1alpha1.LoadBalancerServicePublishingType,
+		NetworkType: contourv1alpha1.LoadBalancerServicePublishingType,
 	}
 	cntr := objcontour.New(cfg)
 	cntr.Spec.Namespace.Name = "test-rb-ns"

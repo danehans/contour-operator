@@ -19,6 +19,7 @@ import (
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 
+	contourv1alpha1 "github.com/projectcontour/contour/apis/projectcontour/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -29,7 +30,7 @@ type Config struct {
 	Namespace   string
 	SpecNs      string
 	RemoveNs    bool
-	NetworkType operatorv1alpha1.NetworkPublishingType
+	NetworkType contourv1alpha1.NetworkPublishingType
 }
 
 // New makes a Contour object using the provided ns/name for the object's
@@ -47,9 +48,9 @@ func New(cfg Config) *operatorv1alpha1.Contour {
 				RemoveOnDeletion: cfg.RemoveNs,
 			},
 			NetworkPublishing: operatorv1alpha1.NetworkPublishing{
-				Envoy: operatorv1alpha1.EnvoyNetworkPublishing{
+				Envoy: contourv1alpha1.NetworkPublishing{
 					Type: cfg.NetworkType,
-					ContainerPorts: []operatorv1alpha1.ContainerPort{
+					ContainerPorts: []contourv1alpha1.ContainerPort{
 						{
 							Name:       "http",
 							PortNumber: int32(8080),

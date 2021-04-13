@@ -24,6 +24,8 @@ import (
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
+
+	contourv1alpha1 "github.com/projectcontour/contour/apis/projectcontour/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -44,6 +46,7 @@ var (
 
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
+	_ = contourv1alpha1.AddToScheme(scheme)
 	_ = operatorv1alpha1.AddToScheme(scheme)
 }
 
@@ -58,7 +61,6 @@ func newClient() (client.Client, error) {
 	return kubeClient, nil
 }
 
-// func newContour(ctx context.Context, cl client.Client, name, ns, specNs string, remove bool, pubType operatorv1alpha1.NetworkPublishingType) (*operatorv1alpha1.Contour, error) {
 func newContour(ctx context.Context, cl client.Client, cfg objcontour.Config) (*operatorv1alpha1.Contour, error) {
 	cntr := objcontour.New(cfg)
 	if err := cl.Create(ctx, cntr); err != nil {

@@ -23,6 +23,7 @@ import (
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
 	objds "github.com/projectcontour/contour-operator/internal/objects/daemonset"
 	objdeploy "github.com/projectcontour/contour-operator/internal/objects/deployment"
+	"github.com/projectcontour/contour-operator/internal/objects/envoy"
 	objjob "github.com/projectcontour/contour-operator/internal/objects/job"
 	objns "github.com/projectcontour/contour-operator/internal/objects/namespace"
 	objsvc "github.com/projectcontour/contour-operator/internal/objects/service"
@@ -197,6 +198,11 @@ func (r *reconciler) ensureContour(ctx context.Context, contour *operatorv1alpha
 		} else {
 			r.log.Info("ensured job for contour", "namespace", contour.Namespace, "name", contour.Name)
 		}
+		if err := envoy.Ensure(ctx, cli, contour); err != nil {
+			errs = append(errs, fmt.Errorf("failed to ensure envoy for contour %s/%s: %w", contour.Namespace, contour.Name, err))
+		} else {
+			r.log.Info("ensured envoy for contour", "namespace", contour.Namespace, "name", contour.Name)
+		}
 		if err := objdeploy.EnsureDeployment(ctx, cli, contour, contourImage); err != nil {
 			errs = append(errs, fmt.Errorf("failed to ensure deployment for contour %s/%s: %w", contour.Namespace, contour.Name, err))
 		} else {
@@ -209,9 +215,9 @@ func (r *reconciler) ensureContour(ctx context.Context, contour *operatorv1alpha
 			r.log.Info("ensured daemonset for contour", "namespace", contour.Namespace, "name", contour.Name)
 		}
 		if err := objsvc.EnsureContourService(ctx, cli, contour); err != nil {
-			errs = append(errs, fmt.Errorf("failed to ensure contour service for contour %s/%s: %w", contour.Namespace, contour.Name, err))
+			errs = append(errs, fmt.Errorf("failed to ensure service for contour %s/%s: %w", contour.Namespace, contour.Name, err))
 		} else {
-			r.log.Info("ensured contour service for contour", "namespace", contour.Namespace, "name", contour.Name)
+			r.log.Info("ensured service for contour", "namespace", contour.Namespace, "name", contour.Name)
 		}
 	}
 	if err := status.SyncContour(ctx, cli, contour); err != nil {
@@ -229,7 +235,7 @@ func (r *reconciler) ensureContourDeleted(ctx context.Context, contour *operator
 	if err := objsvc.EnsureContourServiceDeleted(ctx, cli, contour); err != nil {
 		errs = append(errs, fmt.Errorf("failed to delete service for contour %s/%s: %w", contour.Namespace, contour.Name, err))
 	} else {
-		r.log.Info("deleted contour service for contour", "namespace", contour.Namespace, "name", contour.Name)
+		r.log.Info("deleted service for contour", "namespace", contour.Namespace, "name", contour.Name)
 	}
 	if err := objds.EnsureDaemonSetDeleted(ctx, cli, contour); err != nil {
 		errs = append(errs, fmt.Errorf("failed to delete daemonset from contour %s/%s: %w", contour.Namespace, contour.Name, err))
@@ -238,6 +244,11 @@ func (r *reconciler) ensureContourDeleted(ctx context.Context, contour *operator
 	}
 	if err := objdeploy.EnsureDeploymentDeleted(ctx, cli, contour); err != nil {
 		errs = append(errs, fmt.Errorf("failed to delete deployment from contour %s/%s: %w", contour.Namespace, contour.Name, err))
+	} else {
+		r.log.Info("deleted deployment for contour", "namespace", contour.Namespace, "name", contour.Name)
+	}
+	if err := envoy.EnsureDeleted(ctx, cli, contour); err != nil {
+		errs = append(errs, fmt.Errorf("failed to delete envoy from contour %s/%s: %w", contour.Namespace, contour.Name, err))
 	} else {
 		r.log.Info("deleted deployment for contour", "namespace", contour.Namespace, "name", contour.Name)
 	}

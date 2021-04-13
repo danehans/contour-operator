@@ -16,6 +16,7 @@ package equality
 import (
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 
+	contourv1alpha1 "github.com/projectcontour/contour/apis/projectcontour/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -176,6 +177,20 @@ func ContourStatusChanged(current, expected operatorv1alpha1.ContourStatus) bool
 	}
 
 	if !apiequality.Semantic.DeepEqual(current.Conditions, expected.Conditions) {
+		return true
+	}
+
+	return false
+}
+
+// EnvoyChanged checks if current and expected match and if not,
+// returns true.
+func EnvoyChanged(current, expected *contourv1alpha1.Envoy) bool {
+	if !apiequality.Semantic.DeepEqual(current.Labels, expected.Labels) {
+		return true
+	}
+
+	if !apiequality.Semantic.DeepEqual(current.Spec, expected.Spec) {
 		return true
 	}
 

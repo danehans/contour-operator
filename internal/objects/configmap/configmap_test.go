@@ -17,8 +17,9 @@ import (
 	"fmt"
 	"testing"
 
-	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
+
+	contourv1alpha1 "github.com/projectcontour/contour/apis/projectcontour/v1alpha1"
 )
 
 func TestDesiredContourConfigmap(t *testing.T) {
@@ -130,7 +131,7 @@ accesslog-format: envoy
 		Namespace:   fmt.Sprintf("%s-ns", name),
 		SpecNs:      "projectcontour",
 		RemoveNs:    true,
-		NetworkType: operatorv1alpha1.LoadBalancerServicePublishingType,
+		NetworkType: contourv1alpha1.LoadBalancerServicePublishingType,
 	}
 	cntr := objcontour.New(cfg)
 	cmCfg := NewCfgForContour(cntr)

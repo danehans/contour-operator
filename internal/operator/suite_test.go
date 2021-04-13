@@ -25,6 +25,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	contourv1alpha1 "github.com/projectcontour/contour/apis/projectcontour/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -137,25 +138,25 @@ var _ = Describe("Run controller", func() {
 			}, timeout, interval).Should(Equal(false))
 
 			By("Expecting default network publishing type")
-			Eventually(func() operatorv1alpha1.NetworkPublishingType {
+			Eventually(func() contourv1alpha1.NetworkPublishingType {
 				f := &operatorv1alpha1.Contour{}
 				Expect(operator.client.Get(ctx, key, f)).Should(Succeed())
 				return f.Spec.NetworkPublishing.Envoy.Type
-			}, timeout, interval).Should(Equal(operatorv1alpha1.LoadBalancerServicePublishingType))
+			}, timeout, interval).Should(Equal(contourv1alpha1.LoadBalancerServicePublishingType))
 
 			By("Expecting default load balancer provider")
-			Eventually(func() operatorv1alpha1.LoadBalancerProviderType {
+			Eventually(func() contourv1alpha1.LoadBalancerProviderType {
 				f := &operatorv1alpha1.Contour{}
 				Expect(operator.client.Get(ctx, key, f)).Should(Succeed())
 				return f.Spec.NetworkPublishing.Envoy.LoadBalancer.ProviderParameters.Type
-			}, timeout, interval).Should(Equal(operatorv1alpha1.AWSLoadBalancerProvider))
+			}, timeout, interval).Should(Equal(contourv1alpha1.AWSLoadBalancerProvider))
 
 			By("Expecting default load balancer scope")
-			Eventually(func() operatorv1alpha1.LoadBalancerScope {
+			Eventually(func() contourv1alpha1.LoadBalancerScope {
 				f := &operatorv1alpha1.Contour{}
 				Expect(operator.client.Get(ctx, key, f)).Should(Succeed())
 				return f.Spec.NetworkPublishing.Envoy.LoadBalancer.Scope
-			}, timeout, interval).Should(Equal(operatorv1alpha1.ExternalLoadBalancer))
+			}, timeout, interval).Should(Equal(contourv1alpha1.ExternalLoadBalancer))
 
 			// Update the contour
 			By("By updating a contour spec")

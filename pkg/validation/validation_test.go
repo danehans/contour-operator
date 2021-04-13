@@ -19,6 +19,7 @@ import (
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
 
+	contourv1alpha1 "github.com/projectcontour/contour/apis/projectcontour/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -30,7 +31,7 @@ const (
 func TestContainerPorts(t *testing.T) {
 	testCases := []struct {
 		description string
-		ports       []operatorv1alpha1.ContainerPort
+		ports       []contourv1alpha1.ContainerPort
 		expected    bool
 	}{
 		{
@@ -39,7 +40,7 @@ func TestContainerPorts(t *testing.T) {
 		},
 		{
 			description: "non-default http and https ports",
-			ports: []operatorv1alpha1.ContainerPort{
+			ports: []contourv1alpha1.ContainerPort{
 				{
 					Name:       "http",
 					PortNumber: int32(8081),
@@ -53,7 +54,7 @@ func TestContainerPorts(t *testing.T) {
 		},
 		{
 			description: "duplicate port names",
-			ports: []operatorv1alpha1.ContainerPort{
+			ports: []contourv1alpha1.ContainerPort{
 				{
 					Name:       "http",
 					PortNumber: envoyInsecureContainerPort,
@@ -67,7 +68,7 @@ func TestContainerPorts(t *testing.T) {
 		},
 		{
 			description: "duplicate port numbers",
-			ports: []operatorv1alpha1.ContainerPort{
+			ports: []contourv1alpha1.ContainerPort{
 				{
 					Name:       "http",
 					PortNumber: envoyInsecureContainerPort,
@@ -81,7 +82,7 @@ func TestContainerPorts(t *testing.T) {
 		},
 		{
 			description: "only http port specified",
-			ports: []operatorv1alpha1.ContainerPort{
+			ports: []contourv1alpha1.ContainerPort{
 				{
 					Name:       "http",
 					PortNumber: envoyInsecureContainerPort,
@@ -91,7 +92,7 @@ func TestContainerPorts(t *testing.T) {
 		},
 		{
 			description: "only https port specified",
-			ports: []operatorv1alpha1.ContainerPort{
+			ports: []contourv1alpha1.ContainerPort{
 				{
 					Name:       "https",
 					PortNumber: envoySecureContainerPort,
@@ -101,7 +102,7 @@ func TestContainerPorts(t *testing.T) {
 		},
 		{
 			description: "empty ports",
-			ports:       []operatorv1alpha1.ContainerPort{},
+			ports:       []contourv1alpha1.ContainerPort{},
 			expected:    false,
 		},
 	}
@@ -116,9 +117,9 @@ func TestContainerPorts(t *testing.T) {
 		Spec: operatorv1alpha1.ContourSpec{
 			Namespace: operatorv1alpha1.NamespaceSpec{Name: "projectcontour"},
 			NetworkPublishing: operatorv1alpha1.NetworkPublishing{
-				Envoy: operatorv1alpha1.EnvoyNetworkPublishing{
-					Type: operatorv1alpha1.LoadBalancerServicePublishingType,
-					ContainerPorts: []operatorv1alpha1.ContainerPort{
+				Envoy: contourv1alpha1.NetworkPublishing{
+					Type: contourv1alpha1.LoadBalancerServicePublishingType,
+					ContainerPorts: []contourv1alpha1.ContainerPort{
 						{
 							Name:       "http",
 							PortNumber: int32(8080),

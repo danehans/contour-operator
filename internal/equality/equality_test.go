@@ -23,6 +23,7 @@ import (
 	objjob "github.com/projectcontour/contour-operator/internal/objects/job"
 	objsvc "github.com/projectcontour/contour-operator/internal/objects/service"
 
+	contourv1alpha1 "github.com/projectcontour/contour/apis/projectcontour/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -523,6 +524,61 @@ func TestContourStatusChangedChanged(t *testing.T) {
 		tc.mutate(expected)
 		if changed := equality.ContourStatusChanged(tc.current, *expected); changed != tc.expect {
 			t.Errorf("%s, expect ContourStatusChanged to be %t, got %t", tc.description, tc.expect, changed)
+		}
+	}
+}
+
+func TestEnvoyChanged(t *testing.T) {
+	testCases := []struct {
+		description string
+		current     *contourv1alpha1.Envoy
+		mutate      func(status *contourv1alpha1.Envoy)
+		expect      bool
+	}{
+		{
+			description: "if nothing changed",
+			current:     &contourv1alpha1.Envoy{},
+			mutate:      func(_ *contourv1alpha1.Envoy) {},
+			expect:      false,
+		},
+		{
+			description: "if labels are changed",
+			current: &contourv1alpha1.Envoy{
+				TypeMeta: metav1.TypeMeta{},
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"foo": "bar"},
+				},
+			},
+			mutate: func(e *contourv1alpha1.Envoy) {
+				e.Labels = map[string]string{}
+			},
+			expect: true,
+		},
+		{
+			description: "if spec changes",
+			current: &contourv1alpha1.Envoy{
+				Spec: contourv1alpha1.EnvoySpec{
+					NetworkPublishing: contourv1alpha1.NetworkPublishing{
+						Type: contourv1alpha1.LoadBalancerServicePublishingType,
+					},
+				},
+			},
+			mutate: func(e *contourv1alpha1.Envoy) {
+				e.Spec = contourv1alpha1.EnvoySpec{
+					NetworkPublishing: contourv1alpha1.NetworkPublishing{
+						Type: contourv1alpha1.ClusterIPServicePublishingType,
+					},
+				}
+			},
+			expect: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		expected := tc.current.DeepCopy()
+		tc.mutate(expected)
+		if changed := equality.EnvoyChanged(tc.current, expected); changed != tc.expect {
+			t.Errorf("%s, expect EnvoyStatusChanged to be %t, got %t", tc.description, tc.expect, changed)
 		}
 	}
 }

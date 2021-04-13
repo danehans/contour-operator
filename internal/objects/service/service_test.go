@@ -21,6 +21,7 @@ import (
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
 	objcfg "github.com/projectcontour/contour-operator/internal/objects/sharedconfig"
 
+	contourv1alpha1 "github.com/projectcontour/contour/apis/projectcontour/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -101,7 +102,7 @@ func TestDesiredContourService(t *testing.T) {
 		Namespace:   fmt.Sprintf("%s-ns", name),
 		SpecNs:      "projectcontour",
 		RemoveNs:    false,
-		NetworkType: operatorv1alpha1.LoadBalancerServicePublishingType,
+		NetworkType: contourv1alpha1.LoadBalancerServicePublishingType,
 	}
 	cntr := objcontour.New(cfg)
 	svc := DesiredContourService(cntr)

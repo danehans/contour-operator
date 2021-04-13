@@ -26,6 +26,7 @@ import (
 	objcontour "github.com/projectcontour/contour-operator/internal/objects/contour"
 	"github.com/projectcontour/contour-operator/internal/parse"
 
+	contourv1alpha1 "github.com/projectcontour/contour/apis/projectcontour/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -96,7 +97,7 @@ func TestDefaultContour(t *testing.T) {
 		Namespace:   operatorNs,
 		SpecNs:      specNs,
 		RemoveNs:    false,
-		NetworkType: operatorv1alpha1.LoadBalancerServicePublishingType,
+		NetworkType: contourv1alpha1.LoadBalancerServicePublishingType,
 	}
 	cntr, err := newContour(ctx, kclient, cfg)
 	if err != nil {
@@ -174,7 +175,7 @@ func TestContourNodePortService(t *testing.T) {
 		Namespace:   operatorNs,
 		SpecNs:      specNs,
 		RemoveNs:    false,
-		NetworkType: operatorv1alpha1.NodePortServicePublishingType,
+		NetworkType: contourv1alpha1.NodePortServicePublishingType,
 	}
 	cntr, err := newContour(ctx, kclient, cfg)
 	if err != nil {
@@ -246,7 +247,7 @@ func TestContourClusterIPService(t *testing.T) {
 		Namespace:   operatorNs,
 		SpecNs:      specNs,
 		RemoveNs:    true,
-		NetworkType: operatorv1alpha1.ClusterIPServicePublishingType,
+		NetworkType: contourv1alpha1.ClusterIPServicePublishingType,
 	}
 	cntr, err := newContour(ctx, kclient, cfg)
 	if err != nil {
@@ -339,7 +340,7 @@ func TestContourSpecNs(t *testing.T) {
 		Namespace:   operatorNs,
 		SpecNs:      specNs,
 		RemoveNs:    true,
-		NetworkType: operatorv1alpha1.NodePortServicePublishingType,
+		NetworkType: contourv1alpha1.NodePortServicePublishingType,
 	}
 	cntr, err := newContour(ctx, kclient, cfg)
 	if err != nil {
@@ -411,7 +412,7 @@ func TestMultipleContours(t *testing.T) {
 			Namespace:   operatorNs,
 			SpecNs:      fmt.Sprintf("%s-ns", testName),
 			RemoveNs:    true,
-			NetworkType: operatorv1alpha1.LoadBalancerServicePublishingType,
+			NetworkType: contourv1alpha1.LoadBalancerServicePublishingType,
 		}
 		cntr, err := newContour(ctx, kclient, cfg)
 		if err != nil {
