@@ -410,6 +410,30 @@ func podConditionsMatchExpected(expected, actual map[corev1.PodConditionType]cor
 	return reflect.DeepEqual(expected, filtered)
 }
 
+/*func waitForHTTPResponse(url string, timeout time.Duration, headers map[string]string) error {
+	var resp http.Response
+	method := "GET"
+	err := wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
+		req, _ := http.NewRequest(method, url, nil)
+		for k, v := range headers {
+			req.Header.Add(k, v)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return false, nil
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != 200 {
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		return fmt.Errorf("%s %q failed with status %s: %v", method, url, resp.Status, err)
+	}
+	return nil
+}*/
+
 func waitForHTTPResponse(url string, timeout time.Duration) error {
 	var resp http.Response
 	method := "GET"
@@ -659,4 +683,48 @@ func envoyClusterIP(ctx context.Context, cl client.Client, ns, name string) (str
 		return svc.Spec.ClusterIP, nil
 	}
 	return "", fmt.Errorf("service %s/%s does not have a clusterIP", ns, name)
+}
+
+func waitForIngressLB(ctx context.Context, cl client.Client, timeout time.Duration, ns, name string) (string, error) {
+	nsName := types.NamespacedName{
+		Namespace: ns,
+		Name:      name,
+	}
+	ing := &networkingv1.Ingress{}
+	err := wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
+		if err := cl.Get(ctx, nsName, ing); err != nil {
+			return false, nil
+		}
+		if ing.Status.LoadBalancer.Ingress == nil {
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		return "", fmt.Errorf("timed out waiting for ingress %s/%s load-balancer: %v", ns, name, err)
+	}
+
+	switch {
+	case len(ing.Status.LoadBalancer.Ingress[0].Hostname) > 0:
+		return ing.Status.LoadBalancer.Ingress[0].Hostname, nil
+	case len(ing.Status.LoadBalancer.Ingress[0].IP) > 0:
+		return ing.Status.LoadBalancer.Ingress[0].IP, nil
+	}
+	return "", fmt.Errorf("failed to determine ingress %s/%s load-balancer: %v", ns, name, err)
+}
+
+// isKindCluster returns true if the cluster under test was provisioned using kind.
+func isKindCluster(ctx context.Context, cl client.Client) (bool, error) {
+	ds := &appsv1.DaemonSet{}
+	key := types.NamespacedName{
+		Namespace: "kube-system",
+		Name:      "kindnet",
+	}
+	if err := cl.Get(ctx, key, ds); err != nil {
+		if errors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to get daemonset %s/%s: %v", key.Namespace, key.Name, err)
+	}
+	return true, nil
 }

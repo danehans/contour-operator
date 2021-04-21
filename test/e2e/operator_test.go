@@ -88,6 +88,8 @@ var (
 	testAppReplicas = 3
 	// opLogMsg is the string used to search operator log messages.
 	opLogMsg = "error"
+	// isKind determines if tests should be tuuned to run in a kind cluster.
+	isKind = true
 )
 
 func TestMain(m *testing.M) {
@@ -97,11 +99,26 @@ func TestMain(m *testing.M) {
 	}
 	kclient = cl
 
+	isKind, err = isKindCluster(ctx, kclient)
+	if err != nil {
+		os.Exit(1)
+	}
 	os.Exit(m.Run())
 }
 
 func TestOperatorDeploymentAvailable(t *testing.T) {
 	t.Helper()
+
+	/*isKind, err := isKindCluster(ctx, kclient)
+	switch {
+	case err != nil:
+		t.Fatalf("failed to determine cluster type: %v", err)
+	case !isKind:
+		t.Log("using kind cluster")
+	default:
+		t.Log("using kubernetes cluster")
+	}*/
+
 	if err := waitForDeploymentStatusConditions(ctx, kclient, 3*time.Minute, operatorName, operatorNs, expectedDeploymentConditions...); err != nil {
 		t.Fatalf("failed to observe expected conditions for deployment %s/%s: %v", operatorNs, operatorName, err)
 	}
@@ -123,11 +140,13 @@ func TestDefaultContour(t *testing.T) {
 	}
 	t.Logf("created contour %s/%s", cntr.Namespace, cntr.Name)
 
-	svcName := "envoy"
-	if err := updateLbSvcIPAndNodePorts(ctx, kclient, 1*time.Minute, specNs, svcName); err != nil {
-		t.Fatalf("failed to update service %s/%s: %v", specNs, svcName, err)
+	if isKind {
+		svcName := "envoy"
+		if err := updateLbSvcIPAndNodePorts(ctx, kclient, 1*time.Minute, specNs, svcName); err != nil {
+			t.Fatalf("failed to update service %s/%s: %v", specNs, svcName, err)
+		}
+		t.Logf("updated service %s/%s loadbalancer IP and nodeports", specNs, svcName)
 	}
-	t.Logf("updated service %s/%s loadbalancer IP and nodeports", specNs, svcName)
 
 	if err := waitForContourStatusConditions(ctx, kclient, 5*time.Minute, testName, operatorNs, expectedContourConditions...); err != nil {
 		t.Fatalf("failed to observe expected status conditions for contour %s/%s: %v", operatorNs, testName, err)
@@ -156,7 +175,23 @@ func TestDefaultContour(t *testing.T) {
 	}
 	t.Logf("created ingress %s/%s", specNs, appName)
 
-	if err := waitForHTTPResponse(testURL, 1*time.Minute); err != nil {
+	if !isKind {
+		lb, err := waitForIngressLB(ctx, kclient, 1*time.Minute, specNs, appName)
+		if err != nil {
+			t.Fatalf("failed to get ingress %s/%s load-balancer: %v", specNs, appName, err)
+		}
+		t.Logf("ingress %s/%s has load-balancer %s", specNs, appName, lb)
+		testURL = fmt.Sprintf("http://%s/", lb)
+	}
+
+	//headers := map[string]string{"Host": lb}
+	/*if ip := net.ParseIP(lb); ip != nil {
+		headers["Host"] = lb
+	}*/
+
+	//if err := waitForHTTPResponse(lbURL, 1*time.Minute, headers); err != nil {
+	// Using 3-minute timeout to allow DNS resolvers to be updated, if needed.
+	if err := waitForHTTPResponse(testURL, 3*time.Minute); err != nil {
 		t.Fatalf("failed to receive http response for %q: %v", testURL, err)
 	}
 	t.Logf("received http response for %q", testURL)
@@ -228,6 +263,7 @@ func TestContourNodePortService(t *testing.T) {
 	}
 	t.Logf("created ingress %s/%s", specNs, appName)
 
+	//if err := waitForHTTPResponse(testURL, 1*time.Minute, nil); err != nil {
 	if err := waitForHTTPResponse(testURL, 1*time.Minute); err != nil {
 		t.Fatalf("failed to receive http response for %q: %v", testURL, err)
 	}
@@ -393,6 +429,7 @@ func TestContourSpecNs(t *testing.T) {
 	}
 	t.Logf("created ingress %s/%s", specNs, appName)
 
+	//if err := waitForHTTPResponse(testURL, 1*time.Minute, nil); err != nil {
 	if err := waitForHTTPResponse(testURL, 1*time.Minute); err != nil {
 		t.Fatalf("failed to receive http response for %q: %v", testURL, err)
 	}
@@ -546,6 +583,7 @@ func TestGateway(t *testing.T) {
 	}
 	t.Logf("created httproute %s/%s", cfg.SpecNs, appName)
 
+	//if err := waitForHTTPResponse(testURL, 3*time.Minute, nil); err != nil {
 	if err := waitForHTTPResponse(testURL, 3*time.Minute); err != nil {
 		t.Fatalf("failed to receive http response for %q: %v", testURL, err)
 	}
