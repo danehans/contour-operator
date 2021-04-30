@@ -78,12 +78,18 @@ func ContourForGateway(ctx context.Context, cli client.Client, gw *gatewayv1alph
 		return nil, nil
 	}
 
-	if gc.Spec.ParametersRef == nil {
-		return nil, fmt.Errorf("gateway class %s for gateway %s/%s does not include a Contour resource reference", gc.Name, gw.Namespace, gw.Name)
+	if len(gc.Status.Conditions) == 0 {
+		return nil, fmt.Errorf("gatewayclass %s for gateway %s/%s does not contain status consitions", gc.Name, gw.Namespace, gw.Name)
 	}
 
-	if gc.Spec.ParametersRef.Namespace == nil {
-		return nil, fmt.Errorf("gateway class %s for gateway %s/%s has invalid Contour resource reference, missing namespace", gc.Name, gw.Namespace, gw.Name)
+	admitted := false
+	for _, c := range gc.Status.Conditions {
+		if c.Type == string(gatewayv1alpha1.GatewayClassConditionStatusAdmitted) && c.Status == metav1.ConditionTrue {
+			admitted = true
+		}
+	}
+	if !admitted {
+		return nil, fmt.Errorf("gatewayclass %s for gateway %s/%s is not admitted", gc.Name, gw.Namespace, gw.Name)
 	}
 
 	cntr, err := objcontour.CurrentContour(ctx, cli, *gc.Spec.ParametersRef.Namespace, gc.Spec.ParametersRef.Name)

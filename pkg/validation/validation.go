@@ -80,11 +80,16 @@ func GatewayClass(gc *gatewayv1alpha1.GatewayClass) error {
 
 // parameterRef returns true if parametersRef of gc is valid.
 func parameterRef(gc *gatewayv1alpha1.GatewayClass) error {
+	// ParametersRef is optional.
 	if gc.Spec.ParametersRef == nil {
 		return nil
 	}
 	if gc.Spec.ParametersRef.Scope == nil || *gc.Spec.ParametersRef.Scope != gatewayClassNamespacedParamRef {
 		return fmt.Errorf("invalid parametersRef for gateway class %s, only namespaced-scoped referecnes are supported", gc.Name)
+	}
+	// The referenced contour must be in the operator's namespace.
+	if gc.Spec.ParametersRef.Namespace == nil || *gc.Spec.ParametersRef.Namespace != "contour-operator" {
+		return fmt.Errorf("invalid parametersRef namespace for gateway class %s; must be \"contour-operator\"", gc.Name)
 	}
 	group := gc.Spec.ParametersRef.Group
 	if group != operatorv1alpha1.GatewayClassParamsRefGroup {
