@@ -16,6 +16,7 @@ package validation
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 
 	operatorv1alpha1 "github.com/projectcontour/contour-operator/api/v1alpha1"
@@ -170,20 +171,36 @@ func Gateway(ctx context.Context, cli client.Client, gw *gatewayv1alpha1.Gateway
 // TODO [danehans]: Refactor when more than 2 listeners are supported.
 func gatewayListeners(gw *gatewayv1alpha1.Gateway) error {
 	listeners := gw.Spec.Listeners
-	if len(listeners) != 2 {
-		return fmt.Errorf("%d is an invalid number of listeners", len(gw.Spec.Listeners))
-	}
+
 	if listeners[0].Port == listeners[1].Port {
-		return fmt.Errorf("invalid listeners, port %v is non-unique", listeners[0].Port)
+		return fmt.Errorf("invalid listeners, port %v is non-uniqueFields", listeners[0].Port)
 	}
-	for _, listener := range listeners {
+
+	type uniqueFields struct{
+		id       int
+		hostname *gatewayv1alpha1.Hostname
+		port     gatewayv1alpha1.PortNumber
+		protocol gatewayv1alpha1.ProtocolType
+	}
+	var uniques []uniqueFields
+
+	for i, listener := range listeners {
+		unique := uniqueFields{
+			id:       i,
+			port:     listener.Port,
+			protocol: listener.Protocol,
+		}
 		if listener.Protocol != gatewayv1alpha1.HTTPProtocolType && listener.Protocol != gatewayv1alpha1.HTTPSProtocolType {
 			return fmt.Errorf("invalid listener protocol %s", listener.Protocol)
 		}
 		// TODO [danehans]: Enable TLS validation for HTTPS/TLS listeners.
 		// xref: https://github.com/projectcontour/contour-operator/issues/214
 		// When unspecified, “”, or *, all hostnames are matched.
-		if listener.Hostname == nil || (*listener.Hostname == "" || *listener.Hostname == "*") {
+		if listener.Hostname == nil {
+			continue
+		}
+		if *listener.Hostname == "" || *listener.Hostname == "*" {
+			unique.hostname = listener.Hostname
 			continue
 		}
 		hostname := string(*listener.Hostname)
@@ -198,6 +215,18 @@ func gatewayListeners(gw *gatewayv1alpha1.Gateway) error {
 		}
 		if len(errs) > 0 {
 			return fmt.Errorf("invalid listener hostname %s: %s", hostname, strings.Join(errs, ", "))
+		}
+		// Ensure Listeners are uniqueFields
+		uniques = append(uniques, unique)
+		if len(uniques) > 1 {
+			for _, u := range uniques {
+				if u.id != i {
+					if reflect.DeepEqual(unique, u) {
+						return fmt.Errorf("invalid listeners; each listener must have a unique hostname, " +
+							"port, and protocol")
+					}
+				}
+			}
 		}
 	}
 	// TODO [danehans]: Validate routes of a gateway.
